@@ -15,6 +15,8 @@
 # Output: Data attributes - combined studies:
 #   - "Study" variable attributes:
 #       - basefile, folder, name, ext, dataset, map_type, orig_stat_type, var1, var2
+#        # HALLEE notes: would also like phenotype code please!
+#        # should sample size be in this study variable instead of effect map variable?
 #   - "Effect map" variable attributes:
 #       - matfile variables:
 #           - for correlation: r, p, std_x
