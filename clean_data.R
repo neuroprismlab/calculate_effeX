@@ -6,20 +6,20 @@
 #   - File names:
 #       (dataset)_(act|fc)_(t|t2|r)_(var/group1)_(var/group2)
 #       Ex 1 (FC ttest):            hcp_fc_t_malerest_femalerest.mat
-#       Ex 2 (activation ttest):    hcp_act_t_emotion_rest.mat
+#       Ex 2 (activation ttest):    hcp_act_t_emotion_rest.mat # HALLEE: can we standardize which of var1 and var2 is the "task" and which is the "rest" when it's a task vs. rest comparison?
 #   - Variables:
-#       correlation: r: mx1,  p: mx1, std_x: 1xm
+#       correlation: r: mx1,  p: mx1, std_x: 1xm # HALLEE: what does mx1 and 1xm mean?
 #       t-test:      p: 1xm,  ci: 2xm,  stats.tstat: 1xm, n: 1    if ttest2, instead of n: n1, n2
 #   - Study script names: (matfile name).m
 #
 # Output: Data attributes - combined studies:
 #   - "Study" variable attributes:
 #       - basefile, folder, name, ext, dataset, map_type, orig_stat_type, var1, var2
-#        # HALLEE notes: would also like phenotype code please!
-#        # should sample size be in this study variable instead of effect map variable?
+#        # HALLEE: would also like phenotype code please!
+#        # HALLEE: should sample size be in this study variable instead of effect map variable?
 #   - "Effect map" variable attributes:
 #       - matfile variables:
-#           - for correlation: r, p, std_x
+#           - for correlation: r, p, std_x # HALLEE: add n too (unless I'm missing something)
 #           - for t-test:      p, ci, stats.tstat, n (if ttest2: n1, n2)
 #
 ##############################################
