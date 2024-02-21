@@ -56,7 +56,7 @@ clean_data <- function() {
     study <- data.frame(basefile = basename(file_paths), folder = data_dir)
 
     # parse filenames: (dataset)_(act|fc)_(t|t2|r)_(var/group1)_(var/group2)
-    colnames(study)[1] <- "basefile" # replace name with more descriptive "basefile"
+    colnames(study)[1] <- "basefile" # replace name with more descriptive "basefile" # I think this is redundant, done above in line 56
 
     # temporary replace for nii.gz and pnc tasks so will be treated as single field - will be undone below
     study$basefile <- gsub("\\.nii\\.gz", ".niigz", study$basefile) # nii.gz
@@ -211,7 +211,7 @@ clean_data <- function() {
 
     # TODO: make sure we use "orig_stat" and "orig_stat_type" instead of "stat" and "stat_type" in the other scripts
 
-
+    # TODO: check that we have triangular matrices not full matrices for all studies
 
 
 
