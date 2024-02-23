@@ -81,7 +81,7 @@ clean_data <- function() {
                         orig_stat_type = str_split(name, "_") %>% map_chr(3),
                         var1 = str_split(name, "_") %>% map_chr(4),
                         var2 = str_split(name, "_") %>% map_chr(5))
-
+    # TODO: fix hcp_ep_t_emotion_rest.mat to deal with ep throwing off the splitting for that study
 
     # undo temporary replace for nii.gz and pnc tasks
     fields_to_update <- c("basefile", "ext")
