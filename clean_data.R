@@ -25,15 +25,15 @@
 ##############################################
 
 # for testing, here are some parameters:
-# data_dir <- '/work/neuroprism/effect_size/'
-# exts <- c('mat$', 'nii$', 'nii.gz$')
-# req_fields <- list(
-#     d = c("d", "n"), # only pre-calculated for t activation map niftis
-#     t = c("stats", "n"),
-#     t2 = c("stats", "n1", "n2"),
-#     r = c("r", "n")
-# )
-# output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
+data_dir <- '/work/neuroprism/effect_size/'
+exts <- c('mat$', 'nii$', 'nii.gz$')
+req_fields <- list(
+    d = c("d", "n"), # only pre-calculated for t activation map niftis
+    t = c("stats", "n"),
+    t2 = c("stats", "n1", "n2"),
+    r = c("r", "n")
+)
+output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
 
 clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
 
@@ -106,6 +106,14 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         hcp_ep_patterns_undo <- c(hcp_ep_patterns_undo, replacement)
     } 
 
+    # get names of nih toolbox tasks
+    idx_nih <- grep("nih", study$basefile)
+    nih_tmp <- readMat(paste0(data_dir, study$basefile[idx_nih]))
+    idx = grep("\\.r", attributes(nih_tmp)$names)
+    nih_names <- attributes(nih_tmp)$names[idx]
+    nih_names <- gsub("\\.r", "", nih_names)
+
+
     # get fields from filenames
 
     study <- study %>%
@@ -118,6 +126,13 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
                         var2 = str_split(name, "_") %>% map_chr(5))
     # TODO: account for extra details like in this study: ABCD_fc_r_rest_cbcl_scr_syn_somatic_t_FU1
     # right now only the first 5 splits are used, but we need to account for the possibility of more splits
+
+    # add new rows at the bottom of study for each nih task
+    for (i in 1:length(nih_names)) {
+        study <- rbind(study, study[idx_nih,]) # copy nih toolbox row to the bottom of study
+        study$name[dim(study)[1]] <- paste0(study$name[idx_nih], nih_names[i]) # change study name to include nih task
+        study$var2[dim(study)[1]] <- nih_names[i] # change var2 to the name of the nih task
+    }
 
     # undo temporary replace for nii.gz and pnc tasks
     fields_to_update <- c("basefile", "ext")
@@ -176,7 +191,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
                 # special for nih toolbox since multiple outputs saved in here (card, flanker, list, process)--TODO: break apart original file (prob good to do for all "special cases" to avoid special parsing in script)
                 # tmp$p <- tmp$card.p # not used
                 # tmp$n is okay - already saved as tmp$n, and same for all, as expected
-                tmp$r <- tmp$card.r # TODO: separate nih toolbox data into separate studies?
+                # tmp$r <- tmp$card.r # TODO: separate nih toolbox data into separate studies?
             }
         } else if (grepl('nii', study$ext[s])) {
             # activation maps stored in nifti format
@@ -193,6 +208,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
         # check that all fields are loaded as needed for each orig_stat_type
 
+        # TODO: allow for nih toolbox in this tryCatch
         tryCatch({
             stopifnot(all(req_fields[[this_orig_stat_type]] %in% names(tmp)))
         }, error = function(e) {
@@ -208,6 +224,18 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         if ("stats" %in% names(tmp)) {
             tmp$orig_stat <- tmp$stats[[1]]
         } else {
+            if ("nihtoolbox" %in% this_study) { # TODO: still working on this part!!!!!! 
+                if (study$var2[s] == "card") {
+                    tmp$orig_stat <- tmp$card.r
+                } else if (study$var2 == "flanker") {
+                    tmp$orig_stat <- tmp$flanker.r
+                } else if (study$var2 == "list") {
+                    tmp$orig_stat <- tmp$list.r
+                } else if (study$var2 == "process") {
+                    tmp$orig_stat <- tmp$process.r
+                }
+
+            }
             tmp$orig_stat <- tmp[[this_orig_stat_type]]
             tmp[[this_orig_stat_type]] <- NULL
         }
@@ -223,6 +251,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
             tmp$n2 <- NULL
         }
 
+        # TODO: maybe change this part so that it allows for nih toolbox?
         effect_map[[this_study]] <- tmp
 
     }
