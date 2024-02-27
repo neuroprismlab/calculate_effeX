@@ -24,22 +24,47 @@
 #
 ##############################################
 
-clean_data <- function() {
+# for testing, here are some parameters:
+# data_dir <- '/work/neuroprism/effect_size/'
+# exts <- c('mat$', 'nii$', 'nii.gz$')
+# req_fields <- list(
+#     d = c("d", "n"), # only pre-calculated for t activation map niftis
+#     t = c("stats", "n"),
+#     t2 = c("stats", "n1", "n2"),
+#     r = c("r", "n")
+# )
+# output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
+
+clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
 
     # Libraries
-    library(R.matlab) # for reading .mat effect map files
-    library(oro.nifti) # for reading .nii effect map files
-    library(tidyverse) # pipe
+    # check if libraries are installed, and install if not
+    # R.matlab for reading .mat effect map files
+    # oro.nifti for reading .nii effect map files
+    # tidyverse for pipe
+    for (pkg in c("R.matlab", "Rcpp", "oro.nifti", "tidyverse")) {
+        if (!require(pkg, character.only = TRUE)) {
+            install.packages(pkg, dependencies = TRUE)
+            library(pkg)
+            if (!require(pkg, character.only = TRUE)) {
+                stop(paste("Package", pkg, "not found and could not be installed."))
+            }
+        }
+    }
+    library(R.matlab)
+    library(oro.nifti)
+    library(tidyverse)
+    library(Rcpp)
 
 
     # Check whether to overwrite existing data
 
-    if (file.exists(effect_maps_precursor_filename)) {
-    overwrite <- readline(prompt = paste0("Local pre-loaded data file ", effect_maps_precursor_filename, " already exists. Re-load data from scratch? (y/n)"))
-    if (overwrite != 'y') {
-        stop("Okay, stopping here.")
-    }
-    }
+    # if (file.exists(effect_maps_precursor_filename)) {
+    # overwrite <- readline(prompt = paste0("Local pre-loaded data file ", effect_maps_precursor_filename, " already exists. Re-load data from scratch? (y/n)"))
+    # if (overwrite != 'y') {
+    #     stop("Okay, stopping here.")
+    # }
+    # }
 
 
     # Parse filenames
@@ -51,14 +76,14 @@ clean_data <- function() {
 
     # get filenames
     file_paths <- list.files(path = data_dir, pattern = paste(exts, collapse = "|"), full.names = TRUE)
-    file_paths <- grep(file_paths, pattern = '__helper', invert = TRUE, value = TRUE)
+    file_paths <- grep(file_paths, pattern = '__helper', invert = TRUE, value = TRUE) # exclude helper files
 
     study <- data.frame(basefile = basename(file_paths), folder = data_dir)
 
     # parse filenames: (dataset)_(act|fc)_(t|t2|r)_(var/group1)_(var/group2)
-    colnames(study)[1] <- "basefile" # replace name with more descriptive "basefile" # I think this is redundant, done above in line 56
+    # colnames(study)[1] <- "basefile" # replace name with more descriptive "basefile" # I think this is redundant, done above in line 56
 
-    # temporary replace for nii.gz and pnc tasks so will be treated as single field - will be undone below
+    # temporary replace for nii.gz and pnc tasks and hcp_ep so will be treated as single field - will be undone below
     study$basefile <- gsub("\\.nii\\.gz", ".niigz", study$basefile) # nii.gz
 
     idx_pnc <- grep("pnc", study$basefile) # pnc: _rt, _rc, _acc
@@ -71,6 +96,16 @@ clean_data <- function() {
         pnc_patterns_undo <- c(pnc_patterns_undo, replacement)
     }
 
+    idx_hcp_ep <- grep("hcp_ep", study$basefile) # TODO: change this once we figure out what the ep means
+    hcp_ep_patterns_to_temp_mask <- c("_ep")
+    hcp_ep_patterns_undo <- c()
+
+    for (pattern in hcp_ep_patterns_to_temp_mask) {
+        replacement <- sub("_", "x", pattern)
+        study$basefile[idx_hcp_ep] <- gsub(pattern, replacement, study$basefile[idx_hcp_ep])
+        hcp_ep_patterns_undo <- c(hcp_ep_patterns_undo, replacement)
+    } 
+
     # get fields from filenames
 
     study <- study %>%
@@ -81,7 +116,8 @@ clean_data <- function() {
                         orig_stat_type = str_split(name, "_") %>% map_chr(3),
                         var1 = str_split(name, "_") %>% map_chr(4),
                         var2 = str_split(name, "_") %>% map_chr(5))
-    # TODO: fix hcp_ep_t_emotion_rest.mat to deal with ep throwing off the splitting for that study
+    # TODO: account for extra details like in this study: ABCD_fc_r_rest_cbcl_scr_syn_somatic_t_FU1
+    # right now only the first 5 splits are used, but we need to account for the possibility of more splits
 
     # undo temporary replace for nii.gz and pnc tasks
     fields_to_update <- c("basefile", "ext")
@@ -92,6 +128,11 @@ clean_data <- function() {
     for (pattern in pnc_patterns_undo) {
         replacement <- sub("^x", "_", pattern)
         study$basefile[idx_pnc] <- gsub(pattern, replacement, study$basefile[idx_pnc])
+    }
+
+    for (pattern in hcp_ep_patterns_undo) {
+        replacement <- sub("^x", "_", pattern)
+        study$basefile[idx_hcp_ep] <- gsub(pattern, replacement, study$basefile[idx_hcp_ep])
     }
 
 
@@ -112,12 +153,20 @@ clean_data <- function() {
         study <- study[files_to_keep,]
     }
 
+    # TODO: SLIM studies have r instead of t2 in their .mat files
+    # do we want to store the r values as t2 values? 
+    # for now, for testing purposes, I'm skipping SLIM studies
+    study <- study[!grepl("SLIM", study$basefile),]
+
+
     effect_map <- list()
     for (s in 1:length(study$basefile)) {
 
         this_study <- study$name[s]
         this_orig_stat_type <- study$orig_stat_type[s]
         this_filename <- paste(study$folder[s], '/', study$basefile[s], sep = "")
+        
+        
 
         # load data into tmp (format: .mat or .nii.gz)
 
@@ -127,7 +176,7 @@ clean_data <- function() {
                 # special for nih toolbox since multiple outputs saved in here (card, flanker, list, process)--TODO: break apart original file (prob good to do for all "special cases" to avoid special parsing in script)
                 # tmp$p <- tmp$card.p # not used
                 # tmp$n is okay - already saved as tmp$n, and same for all, as expected
-                tmp$r <- tmp$card.r
+                tmp$r <- tmp$card.r # TODO: separate nih toolbox data into separate studies?
             }
         } else if (grepl('nii', study$ext[s])) {
             # activation maps stored in nifti format
@@ -163,18 +212,28 @@ clean_data <- function() {
             tmp[[this_orig_stat_type]] <- NULL
         }
 
+        # if n, n1, or n2 is null, remove that field
+        if ("n" %in% names(tmp) && is.nan(tmp$n)) {
+            tmp$n <- NULL
+        }
+        if ("n1" %in% names(tmp) && is.nan(tmp$n1)) {
+            tmp$n1 <- NULL
+        }
+        if ("n2" %in% names(tmp) && is.nan(tmp$n2)) {
+            tmp$n2 <- NULL
+        }
+
         effect_map[[this_study]] <- tmp
 
     }
 
-
-
-    # Temporary fixes: flip signs for (rest-task -> task-rest) and (male-female -> female-male)
+       # Temporary fixes: flip signs for (rest-task -> task-rest) and (male-female -> female-male)
+    # (moved up to here, so that we can use the updated study dataframe when we make effect_maps)
 
     # TODO: testing
     # TODO: do this in a separate script
 
-    patterns <- c('*[td]_rest_*', '*_malerest_femalerest*')
+    patterns <- c('*[td]_rest_*', '*_malerest_femalerest*') 
     replacements <- c("\\1_rest", "_femalerest_malerest")
 
     # patterns <- c('*[td]_rest_*', '*2_malerest_femalerest*')
@@ -207,7 +266,7 @@ clean_data <- function() {
 
     ## Save study and effect_maps
 
-    save(study, effect_map, file = effect_maps_precursor_filename)
+    save(study, effect_map, file = output_file)
 
     # TODO: make sure we use "orig_stat" and "orig_stat_type" instead of "stat" and "stat_type" in the other scripts
 
