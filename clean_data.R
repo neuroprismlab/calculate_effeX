@@ -150,7 +150,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     for (pattern in hcp_ep_patterns_undo) {
         replacement <- sub("^x", "_", pattern)
         study$basefile[idx_hcp_ep] <- gsub(pattern, replacement, study$basefile[idx_hcp_ep])
-    }
+    } # TODO: make sure this is working properly and that in the end study and effect_maps both have proper form of study name
 
 
     # Load data
@@ -299,7 +299,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
     # can remove the nihtoolbox studies that have been parsed now
     study <- study[-idx_nih,]
-
+    # remove original nih toolbox study from effect_map
+    effect_map[idx_nih] <- NULL
 
     # check to make sure nihtoolbox studies have all required fields in efect_map
     tryCatch({
