@@ -35,6 +35,8 @@ req_fields <- list(
 )
 output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
 
+# TODO: address CBCL studies
+
 clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
 
     # Libraries
@@ -187,12 +189,6 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
         if (study$ext[s] == 'mat') {
             tmp <- readMat(this_filename)
-            if (grepl("hbn_fc_r_rest_nihtoolbox", this_filename)) {
-                # special for nih toolbox since multiple outputs saved in here (card, flanker, list, process)--TODO: break apart original file (prob good to do for all "special cases" to avoid special parsing in script)
-                # tmp$p <- tmp$card.p # not used
-                # tmp$n is okay - already saved as tmp$n, and same for all, as expected
-                # tmp$r <- tmp$card.r # TODO: separate nih toolbox data into separate studies?
-            }
         } else if (grepl('nii', study$ext[s])) {
             # activation maps stored in nifti format
             tmp_3D <- oro.nifti::readNIfTI(this_filename)
@@ -208,9 +204,14 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
         # check that all fields are loaded as needed for each orig_stat_type
 
-        # TODO: allow for nih toolbox in this tryCatch
         tryCatch({
-            stopifnot(all(req_fields[[this_orig_stat_type]] %in% names(tmp)))
+            if (grepl("nihtoolbox", this_study)) {
+                # if nih toolbox, continue on for now and we will check for required fields later
+                # TODO: check for required nihtoolbox fields later in the code once parsed
+            }
+            else{
+                stopifnot(all(req_fields[[this_orig_stat_type]] %in% names(tmp)))
+            }
         }, error = function(e) {
             existing_fields <- paste(names(tmp), collapse = " ")
             msg <- sprintf("Could not find required variable for %s statistic.\nNeed to provide: %s.\nBut existing variables only include: %s.\nEither file name specifies the wrong statistic type (common for t->t2) or required variables were not saved in the file.", this_orig_stat_type, req_fields[[this_orig_stat_type]], existing_fields)
@@ -222,22 +223,26 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         #   for t and t2, it has been defined in tmp$stats[[1]]
 
         if ("stats" %in% names(tmp)) {
-            tmp$orig_stat <- tmp$stats[[1]]
+            tmp$orig_stat <- tmp$stats[[1]] # what are stats[[2]] and stats[[3]]?
         } else {
-            if ("nihtoolbox" %in% this_study) { # TODO: still working on this part!!!!!! 
-                if (study$var2[s] == "card") {
-                    tmp$orig_stat <- tmp$card.r
-                } else if (study$var2 == "flanker") {
-                    tmp$orig_stat <- tmp$flanker.r
-                } else if (study$var2 == "list") {
-                    tmp$orig_stat <- tmp$list.r
-                } else if (study$var2 == "process") {
-                    tmp$orig_stat <- tmp$process.r
+            if (grepl("nihtoolbox", this_study)) {
+                task <- study$var2[s]
+                tmp$orig_stat <- tmp[[paste0(task, ".r")]]
+                for (other_task in nih_names[nih_names != task]) {
+                    tmp[[paste0(other_task, ".r")]] <- NULL
+                    tmp[[paste0("std.y.", other_task)]] <- NULL
+                    tmp[[paste0(other_task, ".p")]] <- NULL
                 }
-
+                tmp[[paste0(task, ".r")]] <- NULL
+                tmp$p <- tmp[[paste0(task, ".p")]]
+                tmp[[paste0(task, ".p")]] <- NULL
+                tmp$std.Y <- tmp[[paste0("std.y.", task)]]
+                tmp[[paste0("std.y.", task)]] <- NULL
             }
-            tmp$orig_stat <- tmp[[this_orig_stat_type]]
-            tmp[[this_orig_stat_type]] <- NULL
+            else {
+                tmp$orig_stat <- tmp[[this_orig_stat_type]]
+                tmp[[this_orig_stat_type]] <- NULL
+            }
         }
 
         # if n, n1, or n2 is null, remove that field
@@ -292,6 +297,26 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         }
     }
 
+    # can remove the nihtoolbox studies that have been parsed now
+    study <- study[-idx_nih,]
+
+
+    # check to make sure nihtoolbox studies have all required fields in efect_map
+    tryCatch({
+        nih_idx <- grep("nihtoolbox", study$name)
+        for (i in nih_idx) {
+            this_study <- study$name[i]
+            task <- study$var2[i]
+            stopifnot(all(c("n", "std.Y", "std.X", "orig_stat", "p") %in% names(effect_map[[this_study]])))
+        }
+    }, error = function(e) {
+        existing_fields <- paste(names(effect_map[[this_study]]), collapse = " ")
+        msg <- sprintf("Could not find required variable for nihtoolbox statistic.\nNeed to provide: %s.\nBut existing variables only include: %s.\nEither file name specifies the wrong statistic type (common for t->t2) or required variables were not saved in the file.", c("n", "std.Y", "std.X", "orig_stat", "p"), existing_fields)
+        stop(msg) # TODO: update this error message to be correct for nih toolbox check here
+    })
+
+    # TODO: right now the nihtoolbox fix only works for if there's one nihtoolbox study
+    #       just need to make some for loops to address this!
 
     ## Save study and effect_maps
 
