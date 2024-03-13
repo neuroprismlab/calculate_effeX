@@ -9,13 +9,13 @@
 #       Ex 2 (activation ttest):    hcp_act_t_emotion_rest.mat # HALLEE: can we standardize which of var1 and var2 is the "task" and which is the "rest" when it's a task vs. rest comparison?
 #   - Variables:
 #       correlation: r: mx1,  p: mx1, std_x: 1xm # HALLEE: what does mx1 and 1xm mean?
-#       t-test:      p: 1xm,  ci: 2xm,  stats.tstat: 1xm, n: 1    if ttest2, instead of n: n1, n2
+#       t-test:      p: 1xm,  ci: 2xm,  stats.tstat: 1xm, n: 1    if ttest2, instead of n: n1, n2 # TODO: ask Steph, do we want ci here or do we calculate them later now?
 #   - Study script names: (matfile name).m
 #
 # Output: Data attributes - combined studies:
 #   - "Study" variable attributes:
 #       - basefile, folder, name, ext, dataset, map_type, orig_stat_type, var1, var2
-#        # HALLEE: would also like phenotype code please!
+#        # TODO: add phenotype code
 #        # HALLEE: should sample size be in this study variable instead of effect map variable?
 #   - "Effect map" variable attributes:
 #       - matfile variables:
@@ -37,7 +37,7 @@ output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
 
 # TODO: address CBCL studies
 
-clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
+clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
 
     # Libraries
     # check if libraries are installed, and install if not
@@ -155,11 +155,16 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
     # Load data
 
-    # remove files to skip
+    # remove nii files to skip
     if (skip_nii) {
         files_to_remove <- grepl("nii", study$ext)
         study <- study[!files_to_remove,]
     }
+
+    # remove other files to skip
+    files_to_remove <- grepl(paste(skip, collapse = "|"), study$basefile)
+    study <- study[!skip,]
+
 
     if (testing) {   # only use a couple "hard" files
         # choose files with "_rc" and "_malerest_femalerest"
@@ -326,43 +331,6 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     # TODO: make sure we use "orig_stat" and "orig_stat_type" instead of "stat" and "stat_type" in the other scripts
 
     # TODO: check that we have triangular matrices not full matrices for all studies
-
-
-
-
-
-
-
-
-    ## ORIGINAL
-    # for (s in 1:length(study$basefile)) {
-
-    #     this_study <- study$name[s]
-
-    #     # rest-task -> task-rest
-    #     if (grepl('*[td]_rest_*', this_filename)) {
-    #         this_study <- sub("rest_(.*)","\\1_rest",this_study)
-            
-    #         study$name[s] <- this_study
-    #         tmp2 <- strsplit(study$name[s], "_") # split filename components
-    #         study$var1[s] <- sapply(tmp2, "[", 4)
-    #         study$var2[s] <- sapply(tmp2, "[", 5)
-
-    #         effect_map[[study$name[idx]]]$orig_stat <- -effect_map[[study$name[idx]]]$orig_stat
-    #     }
-
-    #     # male-female -> female-male
-    #     if (grepl('*2_malerest_femalerest*', this_filename)) {
-    #         this_study <- sub("malerest_femalerest","femalerest_malerest",this_study)
-            
-    #         study$name[s] <- this_study
-    #         tmp2 <- strsplit(study$name[s], "_") # split filename components
-    #         study$var1[s] <- sapply(tmp2, "[", 4)
-    #         study$var2[s] <- sapply(tmp2, "[", 5)
-
-    #         effect_map[[study$name[idx]]]$orig_stat <- -effect_map[[study$name[idx]]]$orig_stat
-    #     }
-    # }
 
 }
 
