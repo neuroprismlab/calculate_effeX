@@ -38,7 +38,10 @@ cleaned_data <- clean_data()
 d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
 
 # # Estimate simci
-# ci_sim <- estimate_simci(d, cleaned_data$study)
+ci_sim <- estimate_simci(d, cleaned_data$study)
+
+# ci_sim contains all data, with d, and sim_ci
+# cleaned_data$study contains all study attributes
 
 # # Visualize effect maps
 # effeX_vis(d, ci_sim, cleaned_data$study)

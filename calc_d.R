@@ -11,7 +11,7 @@
 #
 ##############################################
 
- calc_d <- function(study, effect_map, num_sdx_r2d = 1) {
+ calc_d <- function(study, effect_map, num_sdx_r2d = 2) {
   # num_sdx_r2d: number of standard deviations in X to use for Maya's r-to-d conversion
   
 
