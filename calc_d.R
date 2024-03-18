@@ -7,18 +7,12 @@
 # - cleaned_data$effect_map: list with effect maps
 #
 # Output: 
-# - effect_map_d: list with effect maps converted to d
+# - effect_map: list with effect maps converted to d, stored as attribute "d"
 #
 ##############################################
 
-
-## IN PROGRESS!!! ## Have not tested at all yet since Discovery is down
-
-
-
-# # Convert effect maps to d
-
- calc_d <- function(study, effect_map) {
+ calc_d <- function(study, effect_map, num_sdx_r2d = 1) {
+  # num_sdx_r2d: number of standard deviations in X to use for Maya's r-to-d conversion
   
 
   # loop through each effect map
@@ -26,30 +20,48 @@
     # Check if effect map is a t value by checking if study$orig_stat_type is equal to "t"
     if (study$orig_stat_type[i] == "t") {
       # convert to d
-      
-      # add d to results list
-
+      this_t <- effect_map[[i]]$orig_stat
+      this_n <- effect_map[[i]]$n[1]
+      this_n_groups <- 1
+      this_d <- this_t / sqrt(this_n)
+      # add d to effect_maps_d
+      effect_map[[i]]$d <- this_d
     }
     # check if effect map is a correlation by checking if study$orig_stat_type is equal to "r"
     else if (study$orig_stat_type[i] == "r") {
       # convert to d
-
+      this_r <- effect_map[[i]]$orig_stat
+      this_n <- effect_map[[i]]$n[1]
+      this_n_groups <- 1
+      this_d <- num_sdx_r2d * this_r / ((1 - this_r^2) ^ (1/2))
       # add d to results list
+      effect_map[[i]]$d <- this_d
     }
     # check if effect map is a d value by checking if study$orig_stat_type is equal to "d"
     else if (study$orig_stat_type[i] == "d") {
       # Do nothing
 
       # add d to results list
+      effect_map[[i]]$d <- this_d
     }
     # check if effect map is a t2 value by checking if study$orig_stat_type is equal to "t2"
     else if (study$orig_stat_type[i] == "t2") {
       # convert to d
+      this_t2 <- effect_map[[i]]$orig_stat
+      this_n1 <- effect_map[[i]]$n1[1]
+      this_n2 <- effect_map[[i]]$n2[1]
+      this_n <- this_n1 + this_n2
+      this_n_groups <- 2
+      this_d <- this_t2 * sqrt(1/this_n1 + 1/this_n2)
 
       # add d to results list
+      effect_map[[i]]$d <- this_d
+    }
+    else {
+      print("Error: could not convert to d. Check that orig_stat_type is one of: r, t, d, t2.")
     }
   }
   
-    return(results)
+    return(effect_map)
 
  }

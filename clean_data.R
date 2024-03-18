@@ -162,8 +162,12 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     }
 
     # remove other files to skip
-    files_to_remove <- grepl(paste(skip, collapse = "|"), study$basefile)
-    study <- study[!skip,]
+    # if skip = NULL, then no files are skipped
+    # if skip = c("hbn"), then all files containing "hbn" are skipped
+    if (!is.null(skip)) {
+        files_to_remove <- grepl(paste(skip, collapse = "|"), study$basefile)
+        study <- study[!files_to_remove,]
+    }
 
 
     if (testing) {   # only use a couple "hard" files
@@ -327,6 +331,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     ## Save study and effect_maps
 
     save(study, effect_map, file = output_file)
+
+    return(list(study = study, effect_map = effect_map))
 
     # TODO: make sure we use "orig_stat" and "orig_stat_type" instead of "stat" and "stat_type" in the other scripts
 

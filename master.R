@@ -35,7 +35,7 @@ source("clean_data.R")
 cleaned_data <- clean_data()
 
 # # Convert effect maps to d
-# d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
+d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
 
 # # Estimate simci
 # ci_sim <- estimate_simci(d, cleaned_data$study)
