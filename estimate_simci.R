@@ -37,6 +37,7 @@ for (i in 1:length(d)) {
         else if (study$orig_stat_type[i] == "r") { # TODO: check if this is the right way to do this for r!
         # load data
         this_d <- d[[i]]$d
+        this_r <- d[[i]]$orig_stat
         this_alpha_corrected <- alpha / length(this_d)
         this_n <- d[[i]]$n[1]
         this_n_groups <- 1
@@ -73,9 +74,6 @@ for (i in 1:length(d)) {
         # add sim CI to d
         d[[i]]$sim_ci_lb <- ci_lb
         d[[i]]$sim_ci_ub <- ci_ub
-
-        # add d to results list
-        effect_map[[i]]$d <- this_d
         }
 
         # check if effect map is a t2 value by checking if study$orig_stat_type is equal to "t2"
@@ -106,5 +104,5 @@ for (i in 1:length(d)) {
     return(d)
 
     # save results to Rdata file
-    saveRDS(d, file = "/work/neuroprism/effect_size/effect_maps_d_simci.Rdata")
+#saveRDS(d, file = "/work/neuroprism/effect_size/effect_maps_d_simci.Rdata")
 }
