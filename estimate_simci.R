@@ -34,27 +34,23 @@ for (i in 1:length(d)) {
         }
 
         # check if effect map is a correlation by checking if study$orig_stat_type is equal to "r"
-        else if (study$orig_stat_type[i] == "r") { # TODO: check if this is the right way to do this for r!
+        else if (study$orig_stat_type[i] == "r") { 
         # load data
-        this_d <- d[[i]]$d
         this_r <- d[[i]]$orig_stat
-        this_alpha_corrected <- alpha / length(this_d)
+        this_alpha_corrected <- alpha / length(this_r)
         this_n <- d[[i]]$n[1]
-        this_n_groups <- 1
-        this_n_vars <- length(this_d)
+        
         z_95 <- qnorm(1 - this_alpha_corrected) # e.g., 0.05 = 1.96
 
-        # calculate sim CI
-        # ci_tmp <- sapply(this_d, function(x) d.ci(x, n1 = this_n, alpha = this_alpha_corrected))
-        # ci_lb <- ci_tmp[1,]
-        # ci_ub <- ci_tmp[3,]
+        r_ci_lb <- tanh(atanh(this_r) - z_95 / sqrt(this_n-3))
+        r_ci_ub <- tanh(atanh(this_r) + z_95 / sqrt(this_n-3))
 
-        ci_lb <- tanh(atanh(this_r) - z_95 / sqrt(this_n-3))
-        ci_ub <- tanh(atanh(this_r) + z_95 / sqrt(this_n-3))
+        d_ci_lb <- num_sdx_r2d * r_ci_lb / (1 - r_ci_lb ^ 2) ^ (1/2)
+        d_ci_ub <- num_sdx_r2d * r_ci_ub / (1 - r_ci_ub ^ 2) ^ (1/2)
 
         # add sim CI to d
-        d[[i]]$sim_ci_lb <- ci_lb
-        d[[i]]$sim_ci_ub <- ci_ub
+        d[[i]]$sim_ci_lb <- d_ci_lb
+        d[[i]]$sim_ci_ub <- d_ci_ub
         }
 
         # check if effect map is a d value by checking if study$orig_stat_type is equal to "d"

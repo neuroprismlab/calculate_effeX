@@ -127,7 +127,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
                         var1 = str_split(name, "_") %>% map_chr(4),
                         var2 = str_split(name, "_") %>% map_chr(5))
     # TODO: account for extra details like in this study: ABCD_fc_r_rest_cbcl_scr_syn_somatic_t_FU1
-    # right now only the first 5 splits are used, but we need to account for the possibility of more splits
+    # right now only the first 5 splits are used, but we should account for the possibility of more splits
 
     # add new rows at the bottom of study for each nih task
     for (i in 1:length(nih_names)) {
