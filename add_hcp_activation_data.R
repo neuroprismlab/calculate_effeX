@@ -11,7 +11,7 @@ for (task in c("emotion", "gambling", "relational", "social", "wm")) {
     task_u = toupper(task_l) # upper-case
 
     n = case_when(
-        task_l == "emotion" ~ 1022,
+        task_l == "emotion" ~ 1022, # TODO: check these numbers since they differ from the n's in the hcp helper files...
         task_l == "gambling" ~ 1057,
         task_l == "relational" ~ 1016,
         task_l == "social" ~ 1027,
