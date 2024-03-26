@@ -307,6 +307,13 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
             study$var1[i] <- sapply(tmp2, "[", 4)
             study$var2[i] <- sapply(tmp2, "[", 5)
 
+            # if switching malerest with femalerest, need to switch n1 and n2 as well
+            if (grepl("_malerest_femalerest", old_name)) {
+                tmp_n1 <- effect_map[[new_name]]$n1
+                effect_map[[new_name]]$n1 <- effect_map[[new_name]]$n2
+                effect_map[[new_name]]$n2 <- tmp_n1
+            } # still need to test this! #TODO
+
             # flip orig_stat sign
             effect_map[[study$name[i]]]$orig_stat <- -effect_map[[study$name[i]]]$orig_stat
         }
