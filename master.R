@@ -32,7 +32,7 @@ source("clean_data.R")
 # Clean effect maps and combine into single data frame
 # TODO: looks like variables are inherited from setparams.R - may not be the best idea - figure out some separation
 # access e.g., with cleaned_data$effect_map
-cleaned_data <- clean_data()
+cleaned_data <- clean_data() # for now, need to run this with skip_nii = TRUE and skip = c("v2") to avoid errors
 
 # # Convert effect maps to d
 d <- calc_d(cleaned_data$study, cleaned_data$effect_map)

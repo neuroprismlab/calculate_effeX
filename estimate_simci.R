@@ -11,7 +11,7 @@
 #
 ##############################################
 
-estimate_simci <- function(d, study, alpha = 0.05) {
+estimate_simci <- function(d, study, alpha = 0.05, num_sdx_r2d = 2, output_file = '/work/neuroprism/effect_size/output/estimate_simci.RData') {
 
 for (i in 1:length(d)) {
     print(i)
@@ -97,8 +97,12 @@ for (i in 1:length(d)) {
         print("Error: could not calculate simultaneous CI. Check that orig_stat_type is one of: r, t, d, t2.")
         }
     }
+
+    # save results
+    save(d, study, file = output_file)
+
+    # return d
     return(d)
 
-    # save results to Rdata file
-#saveRDS(d, file = "/work/neuroprism/effect_size/effect_maps_d_simci.Rdata")
+    
 }
