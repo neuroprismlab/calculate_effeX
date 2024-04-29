@@ -39,12 +39,13 @@ output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
 
 clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
 
+
     # Libraries
     # check if libraries are installed, and install if not
     # R.matlab for reading .mat effect map files
     # oro.nifti for reading .nii effect map files
     # tidyverse for pipe
-    for (pkg in c("R.matlab", "Rcpp", "oro.nifti", "tidyverse")) {
+    for (pkg in c("R.matlab", "Rcpp", "oro.nifti", "tidyverse", "neurobase")) {
         if (!require(pkg, character.only = TRUE)) {
             install.packages(pkg, dependencies = TRUE)
             library(pkg)
@@ -57,6 +58,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     library(oro.nifti)
     library(tidyverse)
     library(Rcpp)
+    library(neurobase)
 
 
     # Check whether to overwrite existing data
@@ -108,13 +110,21 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         hcp_ep_patterns_undo <- c(hcp_ep_patterns_undo, replacement)
     } 
 
-    # get names of nih toolbox tasks
+   
+
+
+    # remove nii files to skip
+    if (skip_nii) {
+        files_to_remove <- grepl("nii", study$basefile)
+        study <- study[!files_to_remove,]
+    }
+
+     # get names of nih toolbox tasks
     idx_nih <- grep("nih", study$basefile)
     nih_tmp <- readMat(paste0(data_dir, study$basefile[idx_nih]))
     idx = grep("\\.r", attributes(nih_tmp)$names)
     nih_names <- attributes(nih_tmp)$names[idx]
     nih_names <- gsub("\\.r", "", nih_names)
-
 
     # get fields from filenames
 
@@ -127,7 +137,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
                         var1 = str_split(name, "_") %>% map_chr(4),
                         var2 = str_split(name, "_") %>% map_chr(5))
     # TODO: account for extra details like in this study: ABCD_fc_r_rest_cbcl_scr_syn_somatic_t_FU1
-    # right now only the first 5 splits are used, but we need to account for the possibility of more splits
+    # right now only the first 5 splits are used, but we should account for the possibility of more splits
 
     # add new rows at the bottom of study for each nih task
     for (i in 1:length(nih_names)) {
@@ -144,22 +154,22 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
     for (pattern in pnc_patterns_undo) {
         replacement <- sub("^x", "_", pattern)
+        # re-find the index for the pnc studies since they may have changed from removing other studies
+        idx_pnc <- grep("pnc", study$basefile)
         study$basefile[idx_pnc] <- gsub(pattern, replacement, study$basefile[idx_pnc])
     }
 
     for (pattern in hcp_ep_patterns_undo) {
         replacement <- sub("^x", "_", pattern)
+        # re-find the index for the hcp_ep studies since they may have changed from removing other studies
+        idx_hcp_ep <- grep("hcpxep", study$basefile)
         study$basefile[idx_hcp_ep] <- gsub(pattern, replacement, study$basefile[idx_hcp_ep])
     } # TODO: make sure this is working properly and that in the end study and effect_maps both have proper form of study name
 
 
     # Load data
 
-    # remove nii files to skip
-    if (skip_nii) {
-        files_to_remove <- grepl("nii", study$ext)
-        study <- study[!files_to_remove,]
-    }
+
 
     # remove other files to skip
     # if skip = NULL, then no files are skipped
@@ -182,7 +192,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     # TODO: SLIM studies have r instead of t2 in their .mat files
     # do we want to store the r values as t2 values? 
     # for now, for testing purposes, I'm skipping SLIM studies
-    study <- study[!grepl("SLIM", study$basefile),]
+    # try not skipping them, steph said it's okay to keep them as r values named t2 values (see meeting notes)
+    # study <- study[!grepl("SLIM", study$basefile),]
 
 
     effect_map <- list()
@@ -276,33 +287,35 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
     # TODO: testing
     # TODO: do this in a separate script
 
-    patterns <- c('*[td]_rest_*', '*_malerest_femalerest*') 
-    replacements <- c("\\1_rest", "_femalerest_malerest")
+    studies_to_flip <- grepl("[td]_rest_", study$name) | grepl("_malerest_femalerest", study$name)
+    # patterns <- c('*[td]_rest_*', '*_malerest_femalerest*') 
+    # replacements <- c("\\1_rest", "femalerest_malerest")
 
     # patterns <- c('*[td]_rest_*', '*2_malerest_femalerest*')
     # replacements <- c("\\1_rest", "femalerest_malerest")
 
-    for (i in seq_along(patterns)) {
-
-        idx <- grepl(patterns[i], study$name)
-        
-        # Flip orig_stat sign and switch variables 1 and 2
-        if (any(idx)) {
+    for (i in seq_along(studies_to_flip)) {
+        if (studies_to_flip[i]) {
             # Update names
-            old_names <- study$name[idx]
-            new_names <- sub(patterns[i], replacements[i], study$name[idx])
-            study$name[idx] <- new_names
-            names(effect_map)[names(effect_map) %in% old_names] <- new_names
-            
+            old_name <- study$name[i]
+            new_name <- paste0(study$dataset[i], "_", study$map_type[i], "_", study$orig_stat_type[i], "_", study$var2[i], "_", study$var1[i])
+            study$name[i] <- new_name
+            names(effect_map)[names(effect_map) %in% old_name] <- new_name
+
             # Assign to var1 and var2
-            tmp2 <- strsplit(study$name[idx], "_")
-            study$var1[idx] <- sapply(tmp2, "[", 4)
-            study$var2[idx] <- sapply(tmp2, "[", 5)
-            
-            # Update orig_stat
-            for (j in which(idx)) {
-                effect_map[[study$name[j]]]$orig_stat <- -effect_map[[study$name[j]]]$orig_stat
-            }
+            tmp2 <- strsplit(study$name[i], "_")
+            study$var1[i] <- sapply(tmp2, "[", 4)
+            study$var2[i] <- sapply(tmp2, "[", 5)
+
+            # if switching malerest with femalerest, need to switch n1 and n2 as well
+            if (grepl("_malerest_femalerest", old_name)) {
+                tmp_n1 <- effect_map[[new_name]]$n1
+                effect_map[[new_name]]$n1 <- effect_map[[new_name]]$n2
+                effect_map[[new_name]]$n2 <- tmp_n1
+            } # still need to test this! #TODO
+
+            # flip orig_stat sign
+            effect_map[[study$name[i]]]$orig_stat <- -effect_map[[study$name[i]]]$orig_stat
         }
     }
 
@@ -327,6 +340,71 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
 
     # TODO: right now the nihtoolbox fix only works for if there's one nihtoolbox study
     #       just need to make some for loops to address this!
+
+
+    # add HCP activation studies (saved as .nii.gz files with abnormal naming conventions currently)
+    # TODO: update this when we have the correct naming conventions
+    for (task in c("emotion", "gambling", "relational", "social", "wm")) {
+    task_l = task
+    task_u = toupper(task_l) # upper-case
+
+    n = case_when(
+        task_l == "emotion" ~ readMat('hcp_act_d_emotion_rest__helper.mat')$n[1], # TODO: check these numbers since they differ from the fc sample sizes??
+        task_l == "gambling" ~ readMat('hcp_act_d_gambling_rest__helper.mat')$n[1],
+        task_l == "relational" ~ readMat('hcp_act_d_relational_rest__helper.mat')$n[1],
+        task_l == "social" ~ readMat('hcp_act_d_social_rest__helper.mat')$n[1],
+        task_l == "wm" ~ readMat('hcp_act_d_wm_rest__helper.mat')$n[1]
+    )
+
+    for (i in 1:length(task_l)) {
+
+        # load nifti
+        data_files <- list.files(path = data_dir, full.names = TRUE)
+        pattern <- paste0(task_u[i], ".*\\.nii\\.gz")
+        matching_file <- grep(pattern, data_files, value = TRUE)
+        nifti <- readnii(matching_file)
+
+        nifti_data <- img_data(nifti)
+
+        list <- as.list(nifti_data)
+
+        # remove zero values (likely those outside of the brain, but could theoretically include some in the brain)
+        nonzero_list <- list[list!=0]
+
+        # convert to numeric
+        nonzero_numeric <- unlist(nonzero_list)
+
+        # create new list entry to add to cleaned_data$effect_map
+        new_data <- list(d = nonzero_numeric, 
+            orig_stat = nonzero_numeric,
+            n = n)
+
+        new_study_data <- data.frame(
+            basefile = basename(matching_file),
+            folder = dirname(matching_file),
+            name = paste0("hcp_", "act", "_", "d", "_", task_l, "_rest"),
+            ext = ".nii.gz",
+            dataset = "hcp",
+            map_type = "act",
+            orig_stat_type = "d",
+            var1 = task_l,
+            var2 = "rest")
+
+    # combine new data with cleaned_data
+    effect_map[[length(effect_map) + 1]] <- new_data
+    effect_map <- `names<-`(effect_map, `[<-`(names(effect_map), (length(effect_map)), new_study_data$name))
+    study <- rbind(study, new_study_data)
+
+    }
+    }
+
+
+    # clean up for consistency
+    # make all datasets, map types, and names capitalized
+    study$dataset <- toupper(study$dataset)
+    study$map_type <- toupper(study$map_type)
+    study$name <- toupper(study$name)
+
 
     ## Save study and effect_maps
 
