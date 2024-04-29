@@ -43,6 +43,11 @@ ci_sim <- estimate_simci(d, cleaned_data$study, alpha)
 # ci_sim contains all data, with d, and sim_ci
 # cleaned_data$study contains all study attributes
 
+# add phenotypic data
+phenotypic_study <- add_phen(cleaned_data$study, phen_file) 
+# phen_file contains study names in one column, and the phenotypic category in the second column
+# column 1: "study", column 2: "code"
+
 # # Visualize effect maps
 # effeX_vis(d, ci_sim, cleaned_data$study)
 
