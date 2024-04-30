@@ -369,10 +369,12 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat
         list <- as.list(nifti_data)
 
         # remove zero values (likely those outside of the brain, but could theoretically include some in the brain)
-        nonzero_list <- list[list!=0]
+        # NEW: don't remove zero values here, remove them when plotting instead because if we remove here then it removes some in the brain and results in 
+        # uneven lengths of the effect maps, then can't average across maps when grouping by stat or category
+        # nonzero_list <- list[list!=0]
 
         # convert to numeric
-        nonzero_numeric <- unlist(nonzero_list)
+        nonzero_numeric <- unlist(list)
 
         # create new list entry to add to cleaned_data$effect_map
         new_data <- list(d = nonzero_numeric, 
