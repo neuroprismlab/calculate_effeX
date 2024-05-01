@@ -40,7 +40,7 @@
     # check if effect map is a d value by checking if study$orig_stat_type is equal to "d"
     else if (study$orig_stat_type[i] == "d") {
       # Do nothing
-
+      this_d <- effect_map[[i]]$orig_stat
       # add d to results list
       effect_map[[i]]$d <- this_d
     }
