@@ -44,6 +44,7 @@ ci_sim <- estimate_simci(d, cleaned_data$study, alpha)
 # cleaned_data$study contains all study attributes
 
 # add phenotypic data
+# creates a new study dataframe that includes a column called "code" with the phenotypic category, and a column called parc with the parcellation of FC studies (NA for activation studies)
 phenotypic_study <- add_phen(cleaned_data$study, phen_file) 
 # phen_file contains study names in one column, and the phenotypic category in the second column
 # column 1: "study", column 2: "code"
