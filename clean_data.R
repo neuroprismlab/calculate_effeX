@@ -22,6 +22,8 @@
 #           - for correlation: r, p, std_x # HALLEE: add n too (unless I'm missing something)
 #           - for t-test:      p, ci, stats.tstat, n (if ttest2: n1, n2)
 #
+# TODO: move all renaming, sign flipping, and triangle->full correction operations to idiosync script where we create a new file for each effect map. Ex: rename r_rest_cognitive_rt -> r_rest_rt, transfer r_rest_cognitive_rt to old/
+#
 ##############################################
 
 # for testing, here are some parameters:
@@ -100,7 +102,7 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
         pnc_patterns_undo <- c(pnc_patterns_undo, replacement)
     }
     
-    idx_hcp_ep <- grep("hcp_ep", study$basefile) # TODO: change this once we figure out what the ep means
+    idx_hcp_ep <- grep("hcp_ep", study$basefile) # TODO: change this once we figure out what the ep means 
     hcp_ep_patterns_to_temp_mask <- c("_ep")
     hcp_ep_patterns_undo <- c()
     
@@ -406,8 +408,8 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
     study$dataset <- toupper(study$dataset)
     study$map_type <- toupper(study$map_type)
     study$name <- toupper(study$name)
-    
-    
+
+
     ## Save study and effect_maps
     
     save(study, effect_map, file = output_file)

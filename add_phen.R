@@ -1,6 +1,6 @@
 # add phenotypic categories to study dataframe
 
-add_phen <- function(study, phen_file = "phen.csv", data_dir = "data/", output_file = "phen_study.Rdata") {
+add_phen <- function(study, effect_maps, phen_file = "phen.csv", data_dir = "data/", output_file = "phen_study.RData") {
     # load phenotypic data file (phen_file) from data directory
     phen <- read.csv(paste0(data_dir, phen_file), header = TRUE)
     # merge phenotypic data with study data
@@ -9,16 +9,16 @@ add_phen <- function(study, phen_file = "phen.csv", data_dir = "data/", output_f
 
     for (i in 1:dim(phen_study)[1]) {
         name <- phen_study[i, "name"]
-        len <- length(effect_map[[which(toupper(names(effect_map)) == name)]]$orig_stat)
+        len <- length(effect_maps[[which(toupper(names(effect_maps)) == name)]]$d)
         if (phen_study[i,"map_type"] == "FC") {
             if (len == 35778) {
-            parc <- "Shen_268_node"
+                stop(paste0("Triangle matrix found, please ensure all matrices are converted to full squares with the triangle_to_square helper function. Study name: ", name))
             }
-            else if (len == 1485) {
-            parc <- "UKB_55_node"
+            else if (sqrt(len) == 55) {
+            ref <- "UKB_55"
             }
-            else if (len == 71824) {
-            parc <- "Shen_268_node_full"
+            else if (sqrt(len) == 268) {
+            ref <- "Shen_268"
             }
             else {
             stop(paste0("Unknown parcellation found, please add this parcellation. Length of effect map: ", len, ". study name: ", name))
@@ -26,10 +26,10 @@ add_phen <- function(study, phen_file = "phen.csv", data_dir = "data/", output_f
         }
         
         else if (phen_study[i, "map_type"] == "ACT") {
-            parc <- NA
+            ref <- "Voxel"
         }
-        # add parc column
-        phen_study$parc[i] <- parc
+        # add ref column
+        phen_study$ref[i] <- ref
     }
 
     save(phen_study, file = output_file)

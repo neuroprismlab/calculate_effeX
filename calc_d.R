@@ -61,6 +61,13 @@
       print("Error: could not convert to d. Check that orig_stat_type is one of: r, t, d, t2.")
     }
   }
+
+
+    # # run all FC maps through triangle_to_square() function to ensure they are in square format
+    # TODO: this only converts d to square now, not std or p
+    for (i in 1:length(effect_map)) {
+        effect_map[[i]]$d <- triangle_to_square(effect_map[i])
+    }
   
     return(effect_map)
 
