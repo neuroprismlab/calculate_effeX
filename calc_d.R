@@ -64,9 +64,10 @@
 
 
     # # run all FC maps through triangle_to_square() function to ensure they are in square format
-    # TODO: this only converts d to square now, not std or p
+    # TODO: this only converts d and orig_stat to square now, not std or p
     for (i in 1:length(effect_map)) {
-        effect_map[[i]]$d <- triangle_to_square(effect_map[i])
+        effect_map[[i]]$d <- triangle_to_square(effect_map[i])[[1]]
+        effect_map[[i]]$orig_stat <- triangle_to_square(effect_map[i])[[2]]
     }
   
     return(effect_map)
