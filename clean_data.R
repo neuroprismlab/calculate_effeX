@@ -27,7 +27,7 @@
 ##############################################
 
 # for testing, here are some parameters:
-data_dir <- '/work/neuroprism/effect_size/'
+data_dir <- '/work/neuroprism/effect_size/data/individual_studies/'
 exts <- c('mat$', 'nii$', 'nii.gz$')
 req_fields <- list(
     d = c("d", "n"), # only pre-calculated for t activation map niftis
@@ -35,11 +35,11 @@ req_fields <- list(
     t2 = c("stats", "n1", "n2"),
     r = c("r", "n")
 )
-output_file <- '/work/neuroprism/effect_size/effect_maps_clean.RData'
+output_file <- '/work/neuroprism/effect_size/data/combined_studies/output/effect_maps_clean.RData'
 
 # TODO: address CBCL studies
 
-function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
+clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_studies/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
     
     
     # Libraries
@@ -56,24 +56,12 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
             }
         }
     }
+
     library(R.matlab)
     library(oro.nifti)
     library(tidyverse)
     library(Rcpp)
     library(neurobase)
-    
-    
-    # Check whether to overwrite existing data
-    
-    # if (file.exists(effect_maps_precursor_filename)) {
-    # overwrite <- readline(prompt = paste0("Local pre-loaded data file ", effect_maps_precursor_filename, " already exists. Re-load data from scratch? (y/n)"))
-    # if (overwrite != 'y') {
-    #     stop("Okay, stopping here.")
-    # }
-    # }
-    
-    
-    # Parse filenames
     
     # check connected
     if (!dir.exists(data_dir)) {
@@ -84,11 +72,9 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
     file_paths <- list.files(path = data_dir, pattern = paste(exts, collapse = "|"), full.names = TRUE)
     file_paths <- grep(file_paths, pattern = '__helper', invert = TRUE, value = TRUE) # exclude helper files
     
-    study <- data.frame(basefile = basename(file_paths), folder = data_dir)
-    
-    # parse filenames: (dataset)_(act|fc)_(t|t2|r)_(var/group1)_(var/group2)
-    # colnames(study)[1] <- "basefile" # replace name with more descriptive "basefile" # I think this is redundant, done above in line 56
-    
+    study <- data.frame(basefile = basename(file_paths), folder = rep(data_dir, length(file_paths)))
+
+    # TODO: idiosyncratic
     # temporary replace for nii.gz and pnc tasks and hcp_ep so will be treated as single field - will be undone below
     study$basefile <- gsub("\\.nii\\.gz", ".niigz", study$basefile) # nii.gz
     
@@ -111,9 +97,6 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
         study$basefile[idx_hcp_ep] <- gsub(pattern, replacement, study$basefile[idx_hcp_ep])
         hcp_ep_patterns_undo <- c(hcp_ep_patterns_undo, replacement)
     } 
-    
-    
-    
     
     # remove nii files to skip
     if (skip_nii) {
@@ -141,6 +124,7 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
     # TODO: account for extra details like in this study: ABCD_fc_r_rest_cbcl_scr_syn_somatic_t_FU1
     # right now only the first 5 splits are used, but we should account for the possibility of more splits
     
+    # TODO: idiosyncratic
     # add new rows at the bottom of study for each nih task
     for (i in 1:length(nih_names)) {
         study <- rbind(study, study[idx_nih,]) # copy nih toolbox row to the bottom of study
@@ -169,13 +153,9 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
     } # TODO: make sure this is working properly and that in the end study and effect_maps both have proper form of study name
     
     
-    # Load data
-    
-    
-    
     # remove other files to skip
     # if skip = NULL, then no files are skipped
-    # if skip = c("hbn"), then all files containing "hbn" are skipped
+    # if skip = c("hbn") for example, then all files containing "hbn" are skipped
     if (!is.null(skip)) {
         files_to_remove <- grepl(paste(skip, collapse = "|"), study$basefile)
         study <- study[!files_to_remove,]
@@ -192,11 +172,7 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
     }
     
     # TODO: SLIM studies have r instead of t2 in their .mat files
-    # do we want to store the r values as t2 values? 
-    # for now, for testing purposes, I'm skipping SLIM studies
-    # try not skipping them, steph said it's okay to keep them as r values named t2 values (see meeting notes)
-    # study <- study[!grepl("SLIM", study$basefile),]
-    
+    # steph said it's okay to keep them as r values named t2 values (see meeting notes)
     
     effect_map <- list()
     for (s in 1:length(study$basefile)) {
@@ -204,7 +180,6 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
         this_study <- study$name[s]
         this_orig_stat_type <- study$orig_stat_type[s]
         this_filename <- paste(study$folder[s], '/', study$basefile[s], sep = "")
-        
         
         
         # load data into tmp (format: .mat or .nii.gz)
@@ -351,11 +326,11 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
         task_u = toupper(task_l) # upper-case
         
         n = case_when(
-            task_l == "emotion" ~ readMat('hcp_act_d_emotion_rest__helper.mat')$n[1], # TODO: check these numbers since they differ from the fc sample sizes??
-            task_l == "gambling" ~ readMat('hcp_act_d_gambling_rest__helper.mat')$n[1],
-            task_l == "relational" ~ readMat('hcp_act_d_relational_rest__helper.mat')$n[1],
-            task_l == "social" ~ readMat('hcp_act_d_social_rest__helper.mat')$n[1],
-            task_l == "wm" ~ readMat('hcp_act_d_wm_rest__helper.mat')$n[1]
+            task_l == "emotion" ~ readMat(paste0(data_dir, 'hcp_act_d_emotion_rest__helper.mat'))$n[1], # TODO: check these numbers since they differ from the fc sample sizes??
+            task_l == "gambling" ~ readMat(paste0(data_dir, 'hcp_act_d_gambling_rest__helper.mat'))$n[1],
+            task_l == "relational" ~ readMat(paste0(data_dir, 'hcp_act_d_relational_rest__helper.mat'))$n[1],
+            task_l == "social" ~ readMat(paste0(data_dir, 'hcp_act_d_social_rest__helper.mat'))$n[1],
+            task_l == "wm" ~ readMat(paste0(data_dir, 'hcp_act_d_wm_rest__helper.mat'))$n[1]
         )
         
         for (i in 1:length(task_l)) {
@@ -402,6 +377,35 @@ function(data_dir = '/work/neuroprism/effect_size/', exts = c('mat$', 'nii$', 'n
         }
     }
     
+    # create a group activation map for HCP that removes any voxels that are zero across all HCP tasks:
+    # create array of zeros with dimensions of d from one of the HCP tasks by the number of tasks
+    all_hcp_act_d <- array(0, dim = c(length(effect_map[[grep("hcp_act", names(effect_map))[[1]]]]$d), length(grep("hcp_act", names(effect_map)))))
+
+    count <- 1
+    for (task in c("emotion", "gambling", "relational", "social", "wm")) {
+        # get the d values from this task
+        d_values <- effect_map[[grep(paste0("hcp_act_d_", task, "_rest"), names(effect_map))]]$d
+        # add d_values to the mask
+        all_hcp_act_d[,count] <- d_values
+        count <- count + 1
+    }
+
+    # create a binary mask with 1s for voxels that are nonzero in any of the tasks
+    mask <- apply(all_hcp_act_d, 1, function(x) any(x != 0))
+
+    # for each task, remove voxels that are zero in all tasks
+    for (task in c("emotion", "gambling", "relational", "social", "wm")) {
+        # get the d values from this task
+        d_values <- effect_map[[grep(paste0("hcp_act_d_", task, "_rest"), names(effect_map))]]$d
+        # get the orig_stat values from this task
+        orig_stat_values <- effect_map[[grep(paste0("hcp_act_d_", task, "_rest"), names(effect_map))]]$orig_stat
+        # remove zero values from d
+        effect_map[[grep(paste0("hcp_act_d_", task, "_rest"), names(effect_map))]]$d <- d_values[mask]
+        # remove zero values from orig_stat
+        effect_map[[grep(paste0("hcp_act_d_", task, "_rest"), names(effect_map))]]$orig_stat <- orig_stat_values[mask]
+    }
+
+
     
     # clean up for consistency
     # make all datasets, map types, and names capitalized
