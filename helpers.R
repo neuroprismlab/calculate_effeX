@@ -233,3 +233,57 @@ square_to_triangle <- function(effect_map, map_path, show_plot = TRUE) {
     plot_lower_triangle(triangle_ordered, map_path, show_plot)
     return(triangle_ordered)
 }
+
+#######e From a triangle, plot a full square matrix
+
+plot_full_mat <- function(triangle_ordered, mapping_path) {
+    # load mapping
+    mapping <- read.csv(mapping_path, header = TRUE)
+
+    # mirror the triangle across the x = y line to get full matrix
+    # first replace the NAs in the lower triangle with 0
+    triangle_ordered[is.na(triangle_ordered)] <- 0
+    full_mat <- triangle_ordered + t(triangle_ordered) #- diag(diag(triangle_ordered))
+
+    # melt the matrix for ggplot
+    melted <- melt(full_mat)
+    colnames(melted) <- c("Var1", "Var2", "value")
+
+    heatmap_plot <- ggplot(melted, aes(Var1, Var2, fill = value)) +
+      
+      geom_tile() +
+      scale_fill_gradient2(limits = c(min(melted$value), max(melted$value)),
+        low = "blue", mid = "white", high = "red", midpoint = 0) +
+      theme_minimal() +
+      theme(axis.title.x = element_text(margin = margin(t = 10)),
+            axis.title.y = element_text(margin = margin(r = 10)),
+            axis.text.x = element_blank(),
+            axis.text.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.ticks.x = element_blank(),
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            plot.margin = margin(.5, .5, .5, .5, "lines"),
+            plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+
+    for (i in 1:(nrow(mapping) - 1)) {
+        if (mapping$category[i] != mapping$category[i + 1]) {
+          heatmap_plot <- heatmap_plot + geom_vline(xintercept = i, color = "black", size = 0.3) +
+            geom_hline(yintercept = i, color = "black")
+        }
+      }
+      
+      # Calculate the positions of the labels
+      label_positions <- c(1, which(mapping$category[-1] != mapping$category[-length(mapping$category)]) + 1, length(mapping$category) + 1)
+      label_positions <- (label_positions[-1] + label_positions[-length(label_positions)]) / 2
+      label_strings <- mapping$label[label_positions]
+      
+      # Add labels to each mapping category
+      heatmap_plot <- heatmap_plot + annotate("text", x = label_positions, y = -6, label = label_strings, angle = 90, hjust = 1, vjust=0.5, size=3.5) + coord_cartesian(clip="off")
+      heatmap_plot <- heatmap_plot + annotate("text", x = -10, y = label_positions, label = label_strings, angle = 0, hjust = 0.5, vjust=1, size=3.5)
+
+      # Add axis labels to the heatmap
+      heatmap_plot <- heatmap_plot + labs(x = "Network", y = "Network")
+        
+    print(heatmap_plot)
+    }
