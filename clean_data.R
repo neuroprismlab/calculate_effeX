@@ -39,7 +39,7 @@ output_file <- '/work/neuroprism/effect_size/data/combined_studies/output/effect
 
 # TODO: address CBCL studies
 
-clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_studies/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), output_file = '/work/neuroprism/effect_size/effect_maps_clean.RData') {
+clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_studies/', exts = c('mat$', 'nii$', 'nii.gz$'), skip_nii = FALSE, skip = NULL, testing = FALSE, req_fields = list(d = c("d", "n"), t = c("stats", "n"), t2 = c("stats", "n1", "n2"), r = c("r", "n")), phen_file = "/work/neuroprism/effect_size/data/helper_data/phen.csv", output_file = '/work/neuroprism/effect_size/data/combined_studies/output/effect_maps_clean.RData') {
     
     
     # Libraries
@@ -274,7 +274,6 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
     # Temporary fixes: flip signs for (rest-task -> task-rest) and (male-female -> female-male)
     # (moved up to here, so that we can use the updated study dataframe when we make effect_maps)
     
-    # TODO: testing
     # TODO: do this in a separate script
     
     studies_to_flip <- grepl("[td]_rest_", study$name) | grepl("_malerest_femalerest", study$name)
@@ -427,6 +426,9 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
     study$map_type <- toupper(study$map_type)
     study$name <- toupper(study$name)
 
+
+    # add phenotypic categories and reference parcellation to study dataframe
+    study <- add_phen(study, effect_map, phen_file = phen_file)
 
     ## Save study and effect_maps
     

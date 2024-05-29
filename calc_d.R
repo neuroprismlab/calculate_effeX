@@ -14,11 +14,14 @@
  calc_d <- function(study, effect_map, num_sdx_r2d = 2) {
   # num_sdx_r2d: number of standard deviations in X to use for Maya's r-to-d conversion
   
+  # TODO: MAKE SURE THAT THE INDEXING IS CORRECT FOR STUDY VS. EFFECT_MAP!!!
 
   # loop through each effect map
   for (i in 1:length(effect_map)) {
+    effect_name <- toupper(names(effect_map))[i]
+    study_idx <- which(toupper(study$name) == effect_name)
     # Check if effect map is a t value by checking if study$orig_stat_type is equal to "t"
-    if (study$orig_stat_type[i] == "t") {
+    if (study$orig_stat_type[study_idx] == "t") {
       # convert to d
       this_t <- effect_map[[i]]$orig_stat
       this_n <- effect_map[[i]]$n[1]
@@ -28,7 +31,7 @@
       effect_map[[i]]$d <- this_d
     }
     # check if effect map is a correlation by checking if study$orig_stat_type is equal to "r"
-    else if (study$orig_stat_type[i] == "r") {
+    else if (study$orig_stat_type[study_idx] == "r") {
       # convert to d
       this_r <- effect_map[[i]]$orig_stat
       this_n <- effect_map[[i]]$n[1]
@@ -38,14 +41,14 @@
       effect_map[[i]]$d <- this_d
     }
     # check if effect map is a d value by checking if study$orig_stat_type is equal to "d"
-    else if (study$orig_stat_type[i] == "d") {
+    else if (study$orig_stat_type[study_idx] == "d") {
       # Do nothing
       this_d <- effect_map[[i]]$orig_stat
       # add d to results list
       effect_map[[i]]$d <- this_d
     }
     # check if effect map is a t2 value by checking if study$orig_stat_type is equal to "t2"
-    else if (study$orig_stat_type[i] == "t2") {
+    else if (study$orig_stat_type[study_idx] == "t2") {
       # convert to d
       this_t2 <- effect_map[[i]]$orig_stat
       this_n1 <- effect_map[[i]]$n1[1]
@@ -65,11 +68,19 @@
 
     # # run all FC maps through triangle_to_square() function to ensure they are in square format
     # TODO: this only converts d and orig_stat to square now, not std or p
+    # for (i in 1:length(effect_map)) {
+    #     effect_map[[i]]$d <- triangle_to_square(effect_map[i])[[1]]
+    #     effect_map[[i]]$orig_stat <- triangle_to_square(effect_map[i])[[2]]
+    # }
+
+    # for HCP activation studies, switch orig_stat_type to t from d TODO: this is a temporary fix
     for (i in 1:length(effect_map)) {
-        effect_map[[i]]$d <- triangle_to_square(effect_map[i])[[1]]
-        effect_map[[i]]$orig_stat <- triangle_to_square(effect_map[i])[[2]]
+      study_name <- study$name[i]
+      if ((study$map_type[i] == "ACT") & (study$dataset[i] == "HCP")) {
+        study$orig_stat_type[i] <- "t"
+      }
     }
   
-    return(effect_map)
+    return(list(study = study, effect_map = effect_map))
 
  }
