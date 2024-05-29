@@ -181,6 +181,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
         this_orig_stat_type <- study$orig_stat_type[s]
         this_filename <- paste(study$folder[s], '/', study$basefile[s], sep = "")
         
+        # print this_study as a progress update for debugging
+        print(this_study)
         
         # load data into tmp (format: .mat or .nii.gz)
         
@@ -252,8 +254,19 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
         if ("n2" %in% names(tmp) && is.nan(tmp$n2)) {
             tmp$n2 <- NULL
         }
+
+        # for each FC study, use the triangle function to make sure the data is in the correct format:
+        if (grepl("FC", toupper(this_study)) & (study$var2[s] != "nihtoolbox")) {
+            map_path <- "/work/neuroprism/effect_size/data/helper_data/map268_subnetwork.csv"
+            if (grepl("UKB", toupper(this_study))) {
+                map_path <- NA
+            } # TODO: add other maps as we have them!
+            tmp$orig_stat <- square_to_triangle(drop(tmp$orig_stat), map_path, show_plot = FALSE)
+        }
+        
         
         # TODO: maybe change this part so that it allows for nih toolbox?
+        
         effect_map[[this_study]] <- tmp
         
     }
@@ -298,6 +311,7 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
     
     # can remove the nihtoolbox studies that have been parsed now
     study <- study[-idx_nih,]
+
     # remove original nih toolbox study from effect_map
     effect_map[idx_nih] <- NULL
     
