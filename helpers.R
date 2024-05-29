@@ -131,55 +131,64 @@ triangle_to_square <-  function(effect_map) {
 
 # FIRST NEED TO REORDER ACCORDING TO MAPPING IF APPLICABLE, THEN TAKE LOWER TRIANGLE, THEN PLOT
 
-# 1. Reorder by mapping if applicable
-mapping <- function(effect_map, map_path) {
-    # turn effect map into a square matrix
-    mat <- matrix(data = effect_map[[1]]$orig_stat, nrow = sqrt(length(effect_map[[1]]$orig_stat)))
+# 1. Convert to square matrix if not already and reorder by mapping if applicable
+mapping <- function(effect_map, map_path = NA) {
+    # check that the study is an FC study not activation
+    if (grepl("fc", names(effect_map))) {
+        # takes an effect map (e.g. d[1]) (COULD BE A SQUARE OR A TRIANGLE) and the path to a mapping file (e.g. 268 note network mapping)
+        # returns a square matrix that is reorganized according to the map provided (if provided)
+        # if it's a triangle...
+        if (sqrt(length(effect_map[[1]]$orig_stat)) %% 1 != 0) {
+            nrow = ((-1 + sqrt(1 + 8 * length(effect_map[[1]]$orig_stat))) / 2) + 1
+            mat <- matrix(0, nrow = nrow, ncol = nrow)
+            mat[upper.tri(mat)] <- effect_map[[1]]$orig_stat
+            # reflect the triangle to get a filled in square matrix (so that when we reorganize it it doesn't get messed up)
+            mat <- mat + t(mat)
+            # now mat is a full square matrix 
 
-    # load map
-    mapping <- read.csv(map_path, header = TRUE)
+        } else { # if it's a square...
+            nrow = sqrt(length(effect_map[[1]]$orig_stat))
+            # turn effect map into a square matrix
+            mat <- matrix(data = effect_map[[1]]$orig_stat, nrow = nrow)
 
-    # reorder based on mapping
-    ordered_mat <- mat[mapping$oldroi, mapping$oldroi]
+        }
 
-    # return the ordered matrix as a matrix
-    return(ordered_mat)
-}
+        # if map is provided:
+        if (!is.na(map_path)) {
+            # load map
+            mapping <- read.csv(map_path, header = TRUE)
+
+            # reorder based on mapping
+            ordered_mat <- mat[mapping$oldroi, mapping$oldroi]
+        } else {
+            # if no map provided, don't change the order
+            ordered_mat <- mat
+        }
+        
+        # return the ordered matrix (or original if no map provided) as a square matrix with zeros in diagonal
+        return(ordered_mat)
+    } else {
+        # if it's an activation study, return an error
+        stop("This function is only for FC studies, you have provided an activation map")
+    }
+} 
 
 # 2. Take lower triangle
 lower_triangle <- function(ordered_mat) {
-    # if result_as_vector is TRUE, then return the flattened matrix as a vector
-    # if include_NA is TRUE, then return the vector with NAs included if results_as_vector is TRUE
-    # if include_NA is FALSE, then return the vector without NAs 
-    # cannot return matrix if includ_NA is FALSE
 
-    # make a mask for the upper triangle (triumask)
+    # make a mask for the lower triangle (trilmask)
     trilmask <- lower.tri(matrix(1, nrow = nrow(ordered_mat), ncol = ncol(ordered_mat)), diag = TRUE)
-    # set the upper triangle to NA
+    # set the lower triangle to NA
     ordered_mat[trilmask] <- NA
     
-    # if (result_as_vector == TRUE) {
-    #     if (include_NA == TRUE) {
-    #         result = c(ordered_mat)
-    #     } else {
-    #         result = c(ordered_mat[!is.na(ordered_mat)])
-    #     }
-    # } else {
-    #     if (include_NA == FALSE) {
-    #         stop("Cannot return a matrix with include_NA == FALSE")
-    #     }
-    #     result = ordered_mat
-    # }
     return(ordered_mat)
 }
 
 # 3. Plot the lower triangle 
-plot_lower_triangle <- function(triangle_ordered, mapping_path, show_plot = TRUE) {
-    # load mapping
-    mapping <- read.csv(mapping_path, header = TRUE)
-
+plot_lower_triangle <- function(triangle_ordered, map_path = NA) {
+    
     # triangle_ordered to matrix
-    triangle_ordered <- matrix(triangle_ordered, nrow = sqrt(length(triangle_ordered)))
+    # triangle_ordered <- matrix(triangle_ordered, nrow = sqrt(length(triangle_ordered)))
 
     # melt the matrix for ggplot
     triangle_melted <- melt(triangle_ordered)
@@ -202,48 +211,61 @@ plot_lower_triangle <- function(triangle_ordered, mapping_path, show_plot = TRUE
             plot.margin = margin(.5, .5, .5, .5, "lines"),
             plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
 
-    for (i in 1:(nrow(mapping) - 1)) {
-        if (mapping$category[i] != mapping$category[i + 1]) {
-          heatmap_plot <- heatmap_plot + geom_vline(xintercept = i, color = "black", size = 0.3) +
-            geom_hline(yintercept = i, color = "black")
-        }
-      }
-      
-      # Calculate the positions of the labels
-      label_positions <- c(1, which(mapping$category[-1] != mapping$category[-length(mapping$category)]) + 1, length(mapping$category) + 1)
-      label_positions <- (label_positions[-1] + label_positions[-length(label_positions)]) / 2
-      label_strings <- mapping$label[label_positions]
-      
-      # Add labels to each mapping category
-      heatmap_plot <- heatmap_plot + annotate("text", x = label_positions, y = -6, label = label_strings, angle = 90, hjust = 1, vjust=0.5, size=3.5) + coord_cartesian(clip="off")
-      heatmap_plot <- heatmap_plot + annotate("text", x = -10, y = label_positions, label = label_strings, angle = 0, hjust = 0.5, vjust=1, size=3.5)
+    if (!is.na(map_path)) {
+        # load mapping
+        mapping <- read.csv(map_path, header = TRUE)
 
-      # Add axis labels to the heatmap
-      heatmap_plot <- heatmap_plot + labs(x = "Network", y = "Network")
+        for (i in 1:(nrow(mapping) - 1)) {
+            if (mapping$category[i] != mapping$category[i + 1]) {
+            heatmap_plot <- heatmap_plot + geom_vline(xintercept = i, color = "black", size = 0.3) +
+                geom_hline(yintercept = i, color = "black")
+            }
+        }
         
-    if (show_plot == TRUE) {
-        print(heatmap_plot)
+        # Calculate the positions of the labels
+        label_positions <- c(1, which(mapping$category[-1] != mapping$category[-length(mapping$category)]) + 1, length(mapping$category) + 1)
+        label_positions <- (label_positions[-1] + label_positions[-length(label_positions)]) / 2
+        label_strings <- mapping$label[label_positions]
+        
+        # Add labels to each mapping category
+        heatmap_plot <- heatmap_plot + annotate("text", x = label_positions, y = -6, label = label_strings, angle = 90, hjust = 1, vjust=0.5, size=3.5) + coord_cartesian(clip="off")
+        heatmap_plot <- heatmap_plot + annotate("text", x = -10, y = label_positions, label = label_strings, angle = 0, hjust = 0.5, vjust=1, size=3.5)
+
+        # Add axis labels to the heatmap
+        heatmap_plot <- heatmap_plot + labs(x = "Network", y = "Network")
+        
     }
+    print(heatmap_plot)
+}
+
+get_triangle <- function(triangle_ordered) {
+    return(triangle_ordered[!is.na(triangle_ordered)])
 }
 
 # 4. Combine all functions
-square_to_triangle <- function(effect_map, map_path, show_plot = TRUE) {
+# returns a triangle as a vector without NA values, so just the one triangle
+square_to_triangle <- function(effect_map, map_path = NA, show_plot = TRUE) {
     ordered_mat <- mapping(effect_map, map_path)
     triangle_ordered <- lower_triangle(ordered_mat)
-    plot_lower_triangle(triangle_ordered, map_path, show_plot)
-    return(triangle_ordered)
+    if (show_plot == TRUE) {
+        plot_lower_triangle(triangle_ordered, map_path)
+    }
+    result <- get_triangle(triangle_ordered)
+    return(result) #TODO: save the result as a file
 }
 
 #######e From a triangle, plot a full square matrix
 
 plot_full_mat <- function(triangle_ordered, mapping_path) {
+    # takes an ordered triangle vector (without NAs) and plots the full matrix
     # load mapping
     mapping <- read.csv(mapping_path, header = TRUE)
 
     # mirror the triangle across the x = y line to get full matrix
-    # first replace the NAs in the lower triangle with 0
-    triangle_ordered[is.na(triangle_ordered)] <- 0
-    full_mat <- triangle_ordered + t(triangle_ordered) #- diag(diag(triangle_ordered))
+    # first fill in half the matrix with the triangle data
+    mat <- matrix(0, nrow = nrow(mapping), ncol = nrow(mapping))
+    mat[upper.tri(mat)] <- triangle_ordered
+    full_mat <- mat + t(mat) #- diag(diag(triangle_ordered))
 
     # melt the matrix for ggplot
     melted <- melt(full_mat)
