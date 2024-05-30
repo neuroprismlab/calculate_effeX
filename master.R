@@ -34,6 +34,9 @@ source("clean_data.R")
 # access e.g., with cleaned_data$effect_map
 cleaned_data <- clean_data() # for now, need to run this with skip_nii = TRUE and skip = c("v2") to avoid errors
 
+# run QC on the clean data, visualize matrices for FC studies:
+fc_qc(cleaned_data) # outputs FC matrices to QC folder
+
 # # Convert effect maps to d
 d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
 
@@ -42,12 +45,6 @@ ci_sim <- estimate_simci(d, cleaned_data$study, alpha)
 
 # ci_sim contains all data, with d, and sim_ci
 # cleaned_data$study contains all study attributes
-
-# add phenotypic data
-# creates a new study dataframe that includes a column called "code" with the phenotypic category, and a column called parc with the parcellation of FC studies (NA for activation studies)
-phenotypic_study <- add_phen(cleaned_data$study, phen_file) 
-# phen_file contains study names in one column, and the phenotypic category in the second column
-# column 1: "study", column 2: "code"
 
 # # Visualize effect maps
 # effeX_vis(d, ci_sim, cleaned_data$study)
