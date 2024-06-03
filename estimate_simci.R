@@ -98,8 +98,17 @@ for (i in 1:length(d)) {
         }
     }
 
+
+     # for HCP activation and FC studies, switch orig_stat_type to t from d TODO: this is a temporary fix
+    for (i in 1:length(d)) {
+      study_name <- study$name[i]
+      if ((study$dataset[i] == "HCP") & (study$orig_stat_type[i] == "d")) {
+        study$orig_stat_type[i] <- "t"
+      }
+    }
+
     # save results
-    save(d, study, file = output_file)
+    save(effect_map = d, study = study, file = output_file)
 
     # return d
     return(d)

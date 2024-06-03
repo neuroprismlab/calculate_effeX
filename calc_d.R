@@ -73,13 +73,7 @@
     #     effect_map[[i]]$orig_stat <- triangle_to_square(effect_map[i])[[2]]
     # }
 
-    # for HCP activation studies, switch orig_stat_type to t from d TODO: this is a temporary fix
-    for (i in 1:length(effect_map)) {
-      study_name <- study$name[i]
-      if ((study$map_type[i] == "ACT") & (study$dataset[i] == "HCP")) {
-        study$orig_stat_type[i] <- "t"
-      }
-    }
+
   
     return(list(study = study, effect_map = effect_map))
 

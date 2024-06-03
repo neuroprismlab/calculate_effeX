@@ -261,6 +261,10 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
             if (grepl("UKB", toupper(this_study))) {
                 map_path <- NA
             } # TODO: add other maps as we have them!
+            # TODO: this is a temporary fix to not reorder the HCP FC studies for now because they are already reordered to 268 map
+            if (grepl("HCP_FC_D", toupper(this_study)) & grepl("FC", toupper(this_study))) {
+                map_path <- NA
+            }
             tmp$orig_stat <- square_to_triangle(drop(tmp$orig_stat), map_path, show_plot = FALSE)
         }
         
