@@ -60,7 +60,4 @@ fc_qc <- function(cleaned_data) {
     return(html_file)
 }
 
-# Example usage
-# cleaned_data <- # Load your data
-# fc_qc(cleaned_data)
 

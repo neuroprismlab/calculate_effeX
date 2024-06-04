@@ -25,8 +25,6 @@
 # Libraries
 source("setparams.R") # USER-DEFINED: review for user-defined parameters
 source("clean_data.R")
-#source("convert_to_d.R")
-#source("estimate_simci.R")
 # source("effeX_vis.R") # rely on Hallee's visualizations
 
 # Clean effect maps and combine into single data frame
@@ -41,12 +39,9 @@ fc_qc(cleaned_data) # outputs FC matrices to QC folder
 d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
 
 # # Estimate simci
-ci_sim <- estimate_simci(d, cleaned_data$study, alpha)
-
-# ci_sim contains all data, with d, and sim_ci
-# cleaned_data$study contains all study attributes
+ci_sim <- estimate_simci(d$effect_map, d$study, alpha)
 
 # # Visualize effect maps
 # effeX_vis(d, ci_sim, cleaned_data$study)
 
-## TODO: Make sure these functions pipe into eachother properly! Haven't tested together yet.
+## TODO: Make sure these functions pipe into eachother properly! Haven't tested together recently.

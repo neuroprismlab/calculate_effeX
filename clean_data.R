@@ -365,7 +365,6 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
             # remove zero values (likely those outside of the brain, but could theoretically include some in the brain)
             # NEW: don't remove zero values here, remove them when plotting instead because if we remove here then it removes some in the brain and results in 
             # uneven lengths of the effect maps, then can't average across maps when grouping by stat or category
-            # nonzero_list <- list[list!=0]
             
             # convert to numeric
             nonzero_numeric <- unlist(list)
@@ -441,7 +440,5 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/individual_
     return(list(study = study, effect_map = effect_map))
     
     # TODO: make sure we use "orig_stat" and "orig_stat_type" instead of "stat" and "stat_type" in the other scripts
-    
-    # TODO: check that we have triangular matrices not full matrices for all studies
     
 }

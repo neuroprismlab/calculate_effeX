@@ -111,7 +111,7 @@ for (i in 1:length(d)) {
     save(effect_map = d, study = study, file = output_file)
 
     # return d
-    return(d)
+    return(list(d, study))
 
     
 }

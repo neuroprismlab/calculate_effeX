@@ -77,55 +77,6 @@ triangle_to_square <-  function(effect_map) {
 }
 
 
-####### Helpers for square_to_triangle ########
-
-# take in an effect map,
-# check if it's FC or act, if it's FC:
-    # check if it's a triangle or square, 
-    # convert to triangle if it's a square
-    # return as a numeric vector (1D)
-# if it's act: return the effect map as a vector
-
-# input: an effect map as a list with d and orig_stat (either square or triangle).. e.g. effect_maps[1]
-# output: an effect map as a vector (triangle)
-
-# square_to_triangle <-  function(effect_map) {
-    
-#     # check if the map is an FC study:
-#     if (grepl("fc", names(effect_map))) {
-
-#         # for d
-#         # if d is a full matrix (square):
-#         if (sqrt(length(effect_map[[1]]$orig_stat)) %% 1 == 0) {
-#             square_d <- matrix(effect_map[[1]]$orig_stat, nrow = sqrt(length(effect_map[[1]]$orig_stat)))
-#             # make a mask for the upper triangle (triumask)
-#             triumask <- upper.tri(matrix(1, nrow = nrow(square_d), ncol = ncol(square_d)), diag = TRUE)
-#             # set the upper triangle to NA
-#             square_d[triumask] <- NA
-#             # transform matrix back to vector
-#             triangle_d <- c(square_d)
-#         } else if ((((-1 + sqrt(1 + 8 * length(effect_map[[1]]$d))) / 2) + 1) %% 1 == 0) {
-#             # else if the map is half a matrix (triangle): 
-#             triangle_d <- c(effect_map[[1]]$d)
-#         }
-
-#         # for orig_stat
-#         # if the map is a full matrix (square):
-#         if (sqrt(length(effect_map[[1]]$orig_stat)) %% 1 == 0) {
-#             # do nothing
-#             square_orig_stat <- matrix(effect_map[[1]]$orig_stat, nrow = sqrt(length(effect_map[[1]]$orig_stat)))
-#             # make a mask for the upper triangle (triumask)
-#             triumask <- upper.tri(matrix(1, nrow = nrow(square_orig_stat), ncol = ncol(square_orig_stat)))
-#             # fill the upper triangle with the map data
-#             upper <- square_orig_stat
-#             upper[triumask] <- effect_map[[1]]$orig_stat
-#             # transform matrix back to vector
-#             triangle_orig_stat <- c(upper[upper.tri(upper)])
-#         } else if ((((-1 + sqrt(1 + 8 * length(effect_map[[1]]$orig_stat))) / 2) + 1) %% 1 == 0) {
-#             # else if the map is half a matrix (triangle):
-
-
-
 
 ########### HELPERS FOR CHANGING A SQUARE MATRIX TO A TRIANGLE MATRIX ###########
 
