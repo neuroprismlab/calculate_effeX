@@ -7,3 +7,6 @@ To summarize...
 2. Perform QC on the cleaned data with qc.R (produces an html report to visually inspect matrices)
 3. Calculate effect sizes with calc_d.R
 4. Estimate simultaneous confidence intervals with estimate_simci.R
+
+
+testing...
