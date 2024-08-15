@@ -43,11 +43,11 @@
 % script and data directories
 
 %motion_dir = '/MOTIONPATH/'; % USER-DEFINED - REMOVED 051624
-scripts_dir = '/work/neuroprism/effect_size/scripts/group_level/helper_scripts/'; 
+scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts/'; 
 %scripts_dir = '/home/USERNAME/scripts/effect_size/';
 results_dir = '/work/neuroprism/effect_size/data/group_level/';
 %data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624
-data_filename = '/work/neuroprism/effect_size/data/subject_level/s_hcp_fc_noble_corr.mat';
+data_filename = '/work/neuroprism/effect_size/data/subject_level/s_hcp_fc_ye.mat';
 
 
 % motion paths - USER-DEFINED - REMOVED 051624
@@ -65,7 +65,7 @@ regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multip
 
 % pooling_params = [0,1]; %TODO: for now set pooling_params to 0 because
 % UKB data
-pooling_params = [0];
+pooling_params = [0,1];
 motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
@@ -139,6 +139,8 @@ S = load(data_filename);
 % S.outcome.('gender').contrast = 'rest';
 
 tests = fieldnames(S.outcome);
+% TEMPORARY TESTING 
+tests = cell({'test2'});
 for i = 1:length(tests)
     % for each outcome...
     test = tests{i}; % get the name of the outcome/score
@@ -147,7 +149,7 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.brain_mask;
+    results.study_info.brain_mask = S.study_info.mask; % TODO: brain mask or mask?
     
     % infer what type of test it is...
     
@@ -194,8 +196,16 @@ for i = 1:length(tests)
         condition = S.outcome.(test).reference_condition;
         % use the reference condition as idx to grab ref brain data
         m = S.brain_data.(condition).data;
+        
+        % make sure the dims of m are subs x parcels
+        if size(m,2) == length(S.brain_data.(condition).sub_ids)
+            % if the second dimension is subjects,
+            % flip dimensions
+            m = m';
+        end
+            
         % m contains brain data as number of subs x number of parcels
-        score = S.outcome.(test).score;
+        score = cell2array(S.outcome.(test).score);
         score_label = S.outcome.(test).score_label;
         % score contains one score per subject to correlate with brain data
         % TODO: check that score and m contain the same subs?
@@ -215,13 +225,21 @@ for i = 1:length(tests)
         condition2 = S.outcome.(test).contrast{2};
         m = S.brain_data.(condition1).data;
         % m is the brain data for the first condition
+        
+        % make sure the dims of m are subs x parcels
+        if size(m,2) == length(S.brain_data.(condition).sub_ids)
+            % if the second dimension is subjects,
+            % flip dimensions
+            m = m';
+        end
+        
         score = S.brain_data.(condition2).data;
         % score is the brain data for the second condition (could change
         % naming conventione here, but I was trying to keep things
         % consistent because after this step it should get treated the same
         % I think?)
-        motion1 = S.brain_data.(condition1).data('motion');
-        motion2 = S.brain_data.(condition2).data('motion');
+        motion1 = S.brain_data.(condition1).motion;
+        motion2 = S.brain_data.(condition2).motion;
         % we have two motion variables here because motion is different for
         % each run! TODO: decide how to use this...
         
@@ -229,33 +247,54 @@ for i = 1:length(tests)
     end
     
     if strcmp(test_type, 't2')
+        
+        % If contrast is NaN, then the contributor has
+        % combined the data and we will use outcome score as dummy variable
+        contrast = S.outcome.(test).contrast;
+        
         % Check if contrast has a length of 2, then that means the
         % contributor has not combined their data so we will combine for
         % them and create the dummy variable. 
+        if iscell(contrast) && length(contrast) == 2
+            condition1 = S.outcome.(test).contrast{1};
+            condition2 = S.outcome.(test).contrast{2};
+            m1 = S.brain_data.(condition1).data;
+            m2 = S.brain_data.(condition2).data;
+            m = cat(2, m1, m2); %TODO: build in a check for dimensions
+            % creating the dummy variable as 'score'
+            
+            % make sure the dims of m are subs x parcels
+            if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
+                % if the second dimension is subjects,
+                % flip dimensions
+                m = m';
+            end
         
-        % If contrast has a length of 1, then the contributor has
-        % combined the data and we will use outcome score as dummy variable
-        contrast = S.outcome.(test).contrast;
-%         if length(contrast) == 1
-%             condition = S.outcome.(score_name).contrast;
-%             m = S.brain_data.(condition).data;
-%             score = S.outcome.(score_name).score;
-%             motion = S.brain_data.(condition).data('motion');
-%         end
-        condition1 = S.outcome.(test).contrast{1};
-        condition2 = S.outcome.(test).contrast{2};
-        m1 = S.brain_data.(condition1).data;
-        m2 = S.brain_data.(condition2).data;
-        m = cat(1, m1, m2);
-        % creating the dummy variable as 'score'
-        score = cat(1, zeros(length(m1), 1), ones(length(m1), 1));
-        motion1 = S.brain_data.(condition1).data('motion');
-        motion2 = S.brain_data.(condition2).data('motion');
-        motion = cat(1, motion1, motion2);
+            score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1));
+            motion1 = S.brain_data.(condition1).motion;
+            motion2 = S.brain_data.(condition2).motion;
+            motion = cat(1, motion1, motion2); % TODO: check table data type
+            
+            results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
 
-        results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
+        elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
+            condition = S.outcome.(test).reference_condition;
+            m = S.brain_data.(condition).data;
+             
+            % make sure the dims of m are subs x parcels
+            if size(m,2) == length(S.brain_data.(condition).sub_ids)
+                % if the second dimension is subjects,
+                % flip dimensions
+                m = m';
+            end
+            
+            score = S.outcome.(test).score;
+            motion = S.brain_data.(condition).motion;
+            results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
 
-    end
+        end
+
+            end
     % TODO: analyze the data
 
     for do_pooling = pooling_params

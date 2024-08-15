@@ -43,7 +43,7 @@
 % script and data directories
 
 %motion_dir = '/MOTIONPATH/'; % USER-DEFINED - REMOVED 051624
-scripts_dir = '/work/neuroprism/effect_size/scripts/group_level/helper_scripts/'; 
+scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts/'; 
 %scripts_dir = '/home/USERNAME/scripts/effect_size/';
 results_dir = '/work/neuroprism/effect_size/data/group_level/';
 %data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624
@@ -65,7 +65,7 @@ regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multip
 
 % pooling_params = [0,1]; %TODO: for now set pooling_params to 0 because
 % UKB data
-pooling_params = [0];
+pooling_params = [0,1];
 motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
@@ -139,6 +139,8 @@ S = load(data_filename);
 % S.outcome.('gender').contrast = 'rest';
 
 tests = fieldnames(S.outcome);
+% TEMPORARY TESTING 
+%tests = cell({'test2'});
 for i = 1:length(tests)
     % for each outcome...
     test = tests{i}; % get the name of the outcome/score
@@ -147,7 +149,7 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.brain_mask;
+    results.study_info.brain_mask = S.study_info.brain_mask; % TODO: brain mask or mask?
     
     % infer what type of test it is...
     
@@ -203,11 +205,11 @@ for i = 1:length(tests)
         end
             
         % m contains brain data as number of subs x number of parcels
-        score = S.outcome.(test).score;
+        score = cell2mat(S.outcome.(test).score);
         score_label = S.outcome.(test).score_label;
         % score contains one score per subject to correlate with brain data
         % TODO: check that score and m contain the same subs?
-        motion = S.brain_data.(condition).motion;
+        motion = table2array(S.brain_data.(condition).motion);
         % TODO: check that motion has same subs as score and m?
         % save contrast to results
         results.study_info.test_components = {condition, score_label};
@@ -236,8 +238,8 @@ for i = 1:length(tests)
         % naming conventione here, but I was trying to keep things
         % consistent because after this step it should get treated the same
         % I think?)
-        motion1 = S.brain_data.(condition1).motion;
-        motion2 = S.brain_data.(condition2).motion;
+        motion1 = table2array(S.brain_data.(condition1).motion);
+        motion2 = table2array(S.brain_data.(condition2).motion);
         % we have two motion variables here because motion is different for
         % each run! TODO: decide how to use this...
         
@@ -271,7 +273,7 @@ for i = 1:length(tests)
             score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1));
             motion1 = S.brain_data.(condition1).motion;
             motion2 = S.brain_data.(condition2).motion;
-            motion = cat(1, motion1, motion2); % TODO: check table data type
+            motion = table2array(cat(1, motion1, motion2)); % TODO: check table data type
             
             results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
 
@@ -287,7 +289,7 @@ for i = 1:length(tests)
             end
             
             score = S.outcome.(test).score;
-            motion = S.brain_data.(condition).motion;
+            motion = table2array(S.brain_data.(condition).motion);
             results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
 
         end
