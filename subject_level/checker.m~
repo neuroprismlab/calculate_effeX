@@ -53,7 +53,7 @@ for i = 1:length(tests)
             S.outcome = rmfield(S.outcome,test);
         end
         
-        % TODO: maybe add something so that if it could be a double it is
+        % 
         
         try 
             S.outcome.(test).score = convertCharsToStrings(S.outcome.(test).score);

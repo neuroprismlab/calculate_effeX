@@ -47,7 +47,7 @@ scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts
 %scripts_dir = '/home/USERNAME/scripts/effect_size/';
 results_dir = '/work/neuroprism/effect_size/data/group_level/';
 %data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624
-data_filename = '/work/neuroprism/effect_size/data/subject_level/s_hcp_fc_ye.mat';
+data_filename = '/work/neuroprism/effect_size/data/subject_level/s_ukb_fc_jiang.mat';
 
 
 % motion paths - USER-DEFINED - REMOVED 051624
@@ -65,7 +65,7 @@ regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multip
 
 % pooling_params = [0,1]; %TODO: for now set pooling_params to 0 because
 % UKB data
-pooling_params = [0,1];
+pooling_params = [0];
 motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
@@ -121,7 +121,7 @@ addpath(regression_fast_script_path);
 
 %this_score='age';
 
-S = load(data_filename);
+% TMP: S = load(data_filename);
 % m = S.brain_data; % don't load this yet, load when required by contrast
 % score = S.(this_score); % age, fluid intelligence, gender
 % sub_motion = S.('framewise displacement');
@@ -138,12 +138,13 @@ S = load(data_filename);
 % S.outcome.('fluid_intelligence').contrast = 'rest';
 % S.outcome.('gender').contrast = 'rest';
 
-tests = fieldnames(S.outcome);
+%tests = fieldnames(S.outcome);
 % TEMPORARY TESTING 
 tests = cell({'test2'});
 for i = 1:length(tests)
     % for each outcome...
     test = tests{i}; % get the name of the outcome/score
+    disp(['running: ', test])
     
     results = []; % clear the struct from prior loops
     results.study_info.dataset = S.study_info.dataset;
@@ -155,7 +156,8 @@ for i = 1:length(tests)
     
     % if score is continuous, then test is r
     % STEPH: is there a better matlab way to check if continuous?
-    if length(unique(S.outcome.(test).score)) > 2
+    if isa(S.outcome.(test).score, 'double') && length(unique(S.outcome.(test).score)) > 2
+        % length(unique(S.outcome.(test).score(~cellfun(@isempty, strtrim(S.outcome.(test).score))))) > 2
         test_type = 'r';
     end
    
@@ -205,7 +207,7 @@ for i = 1:length(tests)
         end
             
         % m contains brain data as number of subs x number of parcels
-        score = cell2array(S.outcome.(test).score);
+        score = S.outcome.(test).score;
         score_label = S.outcome.(test).score_label;
         % score contains one score per subject to correlate with brain data
         % TODO: check that score and m contain the same subs?
@@ -213,7 +215,7 @@ for i = 1:length(tests)
         % TODO: check that motion has same subs as score and m?
         % save contrast to results
         results.study_info.test_components = {condition, score_label};
-        results_file_prefix = [results_dir, 'testing_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
+        results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
             % TODO: remove 'test'
     end
     
@@ -243,7 +245,7 @@ for i = 1:length(tests)
         % we have two motion variables here because motion is different for
         % each run! TODO: decide how to use this...
         
-        results_file_prefix = [results_dir, 'testing_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
+        results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
     end
     
     if strcmp(test_type, 't2')
@@ -270,12 +272,12 @@ for i = 1:length(tests)
                 m = m';
             end
         
-            score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1));
+            score = categorical(cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1))); %TODO: test
             motion1 = S.brain_data.(condition1).motion;
             motion2 = S.brain_data.(condition2).motion;
             motion = cat(1, motion1, motion2); % TODO: check table data type
             
-            results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
+            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
 
         elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
             condition = S.outcome.(test).reference_condition;
@@ -288,13 +290,13 @@ for i = 1:length(tests)
                 m = m';
             end
             
-            score = S.outcome.(test).score;
+            score = categorical(S.outcome.(test).score);
             motion = S.brain_data.(condition).motion;
-            results_file_prefix = [results_dir, 'test_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
+            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
 
         end
 
-            end
+    end
     % TODO: analyze the data
 
     for do_pooling = pooling_params
@@ -331,7 +333,7 @@ for i = 1:length(tests)
             %% Account/correct for motion as specified
             
             motion_method = motion_method_params{motion_method_it};
-            
+            disp(['running motion methhod: ', motion_method])
             % set results name
             result_name = ['pooling_', pooling_method, '_motion_', motion_method];
                 
@@ -372,8 +374,10 @@ for i = 1:length(tests)
 
             if strcmp(motion_method,'regression')
                 % include motion as a confound
+                disp(['running regression, datatype of score2 is ', class(score2)])
                 [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2, motion);
             else
+                disp(['running not regression, datatype of score2 is', class(score2)])
                 [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2);
             end
             results.data.(result_name).r = r;
@@ -416,17 +420,63 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
     % X: n_sub x n_var, y: n_sub x 1, Optional X2: n_sub x n_var
     n = length(y);
     std_X = std(X);
-    std_y = std(y);
+    % only calculate std_y if y is double, otherwise std_y = NaN
+    if isa(y, 'double')
+        disp(['y is double, so calculating std_y'])
+        std_y = std(y);
+        disp(['std_y is ', std_y])
+    else
+        disp(['y is not double, so std_y set to NaN'])
+        std_y = NaN;
+    end
     
-    if nargin==3
-        for i=1:size(X,2)
-            mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+    if nargin==3 % ? including motion regression?
+        
+        if iscategorical(y) && length(rmmissing(unique(y))) == 2
+            % convert categorical to logical
+            levels = rmmissing(unique(y));
+            
+            level_1 = levels(1);
+            y_logical = y == level_1;
+            
+            for i=1:size(X,2)
+                mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y_logical, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            end
+            
+            b = squeeze(mdl(2,1,:))'; % unstandardized betas
+            r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
+            p = squeeze(mdl(2,2,:))';
+        
+        else
+       
+            for i=1:size(X,2)
+                mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            end
+            b = squeeze(mdl(2,1,:))'; % unstandardized betas
+            r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
+            p = squeeze(mdl(2,2,:))';
         end
-        b = squeeze(mdl(2,1,:))'; % unstandardized betas
-        r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
-        p = squeeze(mdl(2,2,:))';
     elseif nargin==2
-        [r,p] = corr(X,y);
+        % only keep subjects that have both score and brain data
+        
+        % if score (y) is categorical, do t2 with point biserial
+        % correlation (ASK STEPH)
+        if iscategorical(y) && length(rmmissing(unique(y))) == 2
+            % convert categorical to logical
+            levels = rmmissing(unique(y));
+            
+            level_1 = levels(1);
+            y_logical = y == level_1;
+            
+            [r, p] = corr(X,y_logical);
+        elseif iscategorical(y)
+            error('Categorical score with more or less than 2 unique values')
+            
+        elseif isa(y, 'double')
+            [r,p] = corr(X,y);
+            
+        end
+            
     else
         error('%d arguments provided but only 2 or 3 allowed.',nargin)
     end
