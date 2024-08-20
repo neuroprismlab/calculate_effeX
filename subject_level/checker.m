@@ -31,6 +31,7 @@ for i = 1:length(conditions)
         disp(['transformed motion from table to array for ', cond])
     end
     disp(['class of ', cond, ' is ', class(S.brain_data.(cond).motion)])
+    
 end
 
         
@@ -46,8 +47,39 @@ for i = 1:length(tests)
     if iscell(S.outcome.(test).score)
         disp([test, ' is a cell array'])
         % if it's character array and there are more than two unique, discard
-        %if length(unique(S.outcome.(test).score)) > 2
         
+        % TODO: remove subjects from empty cells
+        
+        % if there are only two unique values, change to zeros and ones
+        if length(unique(rmmissing(S.outcome.(test).score))) == 2
+            keys = [0, 1];
+            values = unique(rmmissing(S.outcome.(test).score));
+            
+            level_map = [];
+            for i = 1:length(keys)
+                key = i - 1;
+                key_name = ['key_', num2str(key)];
+                level_map.(key_name).key = key;
+                level_map.(key_name).value = values(i);
+                S.outcome.(test).score(cellfun(@(x) strcmp(x, values{i}), S.outcome.(test).score)) = {key};
+            end
+            
+            % remove empty cells
+            emptyCells = cellfun(@isempty, S.outcome.(test).score);
+            % remove empty cells from score
+            S.outcome.(test).score(emptyCells) = [];
+            % remove also from subject ID list
+            S.outcome.(test).sub_ids(emptyCells) = [];
+            
+            % remove NaN cells
+            nanCells = cellfun(@(x) any(isnan(x)), S.outcome.(test).score);
+            % remove from score
+            S.outcome.(test).score(nanCells) = [];
+            % remove from sub id list
+            S.outcome.(test).sub_ids(nanCells) = [];
+        end
+        
+        % TODO: might need to move this, account for doubles
         if length(unique(rmmissing(S.outcome.(test).score))) > 2
             disp([test, ' has more than 2 unique levels. Removing it'])
             S.outcome = rmfield(S.outcome,test);
@@ -63,6 +95,8 @@ for i = 1:length(tests)
             S.outcome = rmfield(S.outcome,test);
             disp(['could not transform ', test, ' to a matrix. ', test, 'reremoved.'])
         end
+        
+            
         
     end
 end
