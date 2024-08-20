@@ -121,7 +121,7 @@ addpath(regression_fast_script_path);
 
 %this_score='age';
 
-% TMP: S = load(data_filename);
+S = load(data_filename);
 % m = S.brain_data; % don't load this yet, load when required by contrast
 % score = S.(this_score); % age, fluid intelligence, gender
 % sub_motion = S.('framewise displacement');
@@ -132,15 +132,11 @@ addpath(regression_fast_script_path);
 % each contrast struct will have one struct for each combination of pooling
 % and motion regression
 
+tests = fieldnames(S.outcome);
 
-% TEMPORARY FIX - TODO: remove this once contrast is updated in data input
-% S.outcome.('age').contrast = 'rest';
-% S.outcome.('fluid_intelligence').contrast = 'rest';
-% S.outcome.('gender').contrast = 'rest';
-
-%tests = fieldnames(S.outcome);
 % TEMPORARY TESTING 
-tests = cell({'test3'});
+%tests = cell({'test3'});
+
 for i = 1:length(tests)
     % for each outcome...
     test = tests{i}; % get the name of the outcome/score
@@ -298,6 +294,8 @@ for i = 1:length(tests)
 
     end
     % TODO: analyze the data
+    % TODO: intersection between brain data subs and score subs
+    % TODO: remove nans in checker
 
     for do_pooling = pooling_params
 
@@ -415,11 +413,14 @@ end
 
 % TODO: either convert the above to point-biserial correlation coefficient or t-statistic or add a function to calculate these
 
-% TODO: check this function
+% separate function first that 
+
 function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
     % X: n_sub x n_var, y: n_sub x 1, Optional X2: n_sub x n_var
+    % X is brain data, y is score, X2 is motion
     n = length(y);
     std_X = std(X);
+    
     % only calculate std_y if y is double, otherwise std_y = NaN
     if isa(y, 'double')
         %disp(['y is double, so calculating std_y'])
@@ -430,15 +431,17 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
         std_y = NaN;
     end
     
-    if nargin==3 % ? including motion regression?
+    if nargin==3 % regressing score and motion
         
+        % if score is categorical with two options
         if iscategorical(y) && length(rmmissing(unique(y))) == 2
+            
             % convert categorical to logical
             levels = rmmissing(unique(y));
-            
             level_1 = levels(1);
             y_logical = y == level_1;
             
+            % for each brain variable, perform regression
             for i=1:size(X,2)
                 mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y_logical, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
             end
@@ -456,11 +459,12 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
             r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
             p = squeeze(mdl(2,2,:))';
         end
-    elseif nargin==2
-        % only keep subjects that have both score and brain data
+        
+    elseif nargin==2 % regress brain data with score
+        % TODO: only keep subjects that have both score and brain data
         
         % if score (y) is categorical, do t2 with point biserial
-        % correlation (ASK STEPH)
+        % correlation by converting y to logical (ASK STEPH)
         if iscategorical(y) && length(rmmissing(unique(y))) == 2
             % convert categorical to logical
             levels = rmmissing(unique(y));
@@ -469,8 +473,10 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
             y_logical = y == level_1;
             
             [r, p] = corr(X,y_logical);
+            
         elseif iscategorical(y)
             error('Categorical score with more or less than 2 unique values')
+            % in future could do something like an ANOVA for more than 2?
             
         elseif isa(y, 'double')
             [r,p] = corr(X,y);
@@ -479,6 +485,7 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
             
     else
         error('%d arguments provided but only 2 or 3 allowed.',nargin)
+        
     end
     
     % TODO: the dimensions are flipped between the output from no motion

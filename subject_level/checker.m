@@ -15,10 +15,10 @@
 
 % load data
 data_path = '/work/neuroprism/effect_size/data/subject_level/';
-data_filename = 's_ukb_fc_jiang.mat';
+data_filename = 's_abcd_fc_rosenblatt.mat';
 
-%S = load([data_path, data_filename]);
-S = S_1;
+S = load([data_path, data_filename]);
+
 
 % check that motion is an array
 conditions = fieldnames(S.brain_data);
