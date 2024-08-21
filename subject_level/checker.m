@@ -15,7 +15,7 @@
 
 % load data
 data_path = '/work/neuroprism/effect_size/data/subject_level/';
-data_filename = 's_abcd_fc_rosenblatt.mat';
+data_filename = 's_hcp_act_noble_1.mat';
 
 S = load([data_path, data_filename]);
 
@@ -40,66 +40,117 @@ tests = fieldnames(S.outcome);
 
 for i = 1:length(tests)
     test = tests{i};
-    %if isdouble(S.outcome.(test).score)
-        %if length(unique(S.outcome.(test).score)) ==  2
     disp(['checking ', test])
+    disp([test, ' is class ', class(S.outcome.(test).score)])
     
+    % check cell arrays
     if iscell(S.outcome.(test).score)
-        disp([test, ' is a cell array'])
         % if it's character array and there are more than two unique, discard
         
-        % TODO: remove subjects from empty cells
+        % remove empty and NaN cells
+        emptyCells = cellfun(@isempty, S.outcome.(test).score);
+        % remove empty cells from score
+        S.outcome.(test).score(emptyCells) = [];
+        % remove also from subject ID list
+        S.outcome.(test).sub_ids(emptyCells) = [];
+        disp(['removed ', num2str(sum(emptyCells)), ' empty cells'])
+
+        % remove NaN cells
+        nanCells = cellfun(@(x) any(isnan(x)), S.outcome.(test).score);
+        % remove from score
+        S.outcome.(test).score(nanCells) = [];
+        % remove from sub id list
+        S.outcome.(test).sub_ids(nanCells) = [];
+        disp(['removed ', num2str(sum(emptyCells)), ' NaN cells'])
+        
+        % if cell array contains numbers, convert to numeric array
+        if all(cellfun(@isnumeric, S.outcome.(test).score))
+            S.outcome.(test).score = cell2mat(S.outcome.(test).score);
+            disp([test, ' converted from cell to numeric array'])
         
         % if there are only two unique values, change to zeros and ones
-        if length(unique(rmmissing(S.outcome.(test).score))) == 2
+        elseif length(unique(S.outcome.(test).score)) == 2
             keys = [0, 1];
             values = unique(rmmissing(S.outcome.(test).score));
             
             level_map = [];
-            for i = 1:length(keys)
-                key = i - 1;
+            for idx = 1:length(keys)
+                key = keys(idx);
                 key_name = ['key_', num2str(key)];
                 level_map.(key_name).key = key;
-                level_map.(key_name).value = values(i);
-                S.outcome.(test).score(cellfun(@(x) strcmp(x, values{i}), S.outcome.(test).score)) = {key};
+                level_map.(key_name).value = values(idx);
+                S.outcome.(test).score(cellfun(@(x) strcmp(x, values{idx}), S.outcome.(test).score)) = {key};
             end
+            disp([test, ' has two levels. Converted to binary.'])
             
-            % remove empty cells
-            emptyCells = cellfun(@isempty, S.outcome.(test).score);
-            % remove empty cells from score
-            S.outcome.(test).score(emptyCells) = [];
-            % remove also from subject ID list
-            S.outcome.(test).sub_ids(emptyCells) = [];
+            % transform from cell array to matrix
+            S.outcome.(test).score = cell2mat(S.outcome.(test).score);
+            disp([test, ' converted from cell to numeric array'])
             
-            % remove NaN cells
-            nanCells = cellfun(@(x) any(isnan(x)), S.outcome.(test).score);
-            % remove from score
-            S.outcome.(test).score(nanCells) = [];
-            % remove from sub id list
-            S.outcome.(test).sub_ids(nanCells) = [];
+            % save level_map
+            S.outcome.(test).level_map = level_map;
+            
+        elseif length(unique(S.outcome.(test).score)) > 2
+            disp([test, ' has more than 2 unique levels (and not numeric). Removing it'])
+            S.outcome = rmfield(S.outcome,test);
         end
+       
+       
+%         
+%         try 
+%             S.outcome.(test).score = convertCharsToStrings(S.outcome.(test).score);
+%             disp([test, ' changed to string array and saved'])
+%            
+%         catch 
+%             S.outcome = rmfield(S.outcome,test);
+%             disp(['could not transform ', test, ' to a matrix. ', test, 'reremoved.'])
+%         end
         
-        % TODO: might need to move this, account for doubles
-        if length(unique(rmmissing(S.outcome.(test).score))) > 2
-            disp([test, ' has more than 2 unique levels. Removing it'])
+    elseif isa(S.outcome.(test).score, 'categorical')
+        nan_idx = isundefined(S.outcome.(test).score);
+        S.outcome.(test).score = S.outcome.(test).score(~nan_idx);
+        S.outcome.(test).sub_ids = S.outcome.(test).sub_ids(~nan_idx);
+        
+        disp(['removed ', num2str(sum(nan_idx)), ' empty cells'])
+        
+        % change categorical to binary 0s and 1s
+        if length(unique(S.outcome.(test).score)) == 2
+
+            keys = [0, 1];
+            values = unique(S.outcome.(test).score);
+
+            level_map = [];
+            for idx = 1:length(keys)
+                key = keys(idx);
+                key_name = ['key_', num2str(key)];
+                level_map.(key_name).key = key;
+                level_map.(key_name).value = values(idx);
+            end
+            S.outcome.(test).score = double(ismember(S.outcome.(test).score, values(2)));
+            disp([test, ' has two levels. Converted to binary.'])
+            
+            % save level_map
+            S.outcome.(test).level_map = level_map;
+       
+        elseif length(unique(S.outcome.(test).score)) > 2
+            disp([test, ' has more than 2 unique levels (and not numeric). Removing it'])
             S.outcome = rmfield(S.outcome,test);
         end
         
-        % TODO: maybe add something so that if it could be a double it is
         
-        try 
-            S.outcome.(test).score = convertCharsToStrings(S.outcome.(test).score);
-            disp([test, ' changed to string array and saved'])
-           
-        catch 
-            S.outcome = rmfield(S.outcome,test);
-            disp(['could not transform ', test, ' to a matrix. ', test, 'reremoved.'])
-        end
+    else 
+        % remove NaN values
+        nan_idx = isnan(S.outcome.(test).score);
+        S.outcome.(test).score = S.outcome.(test).score(~nan_idx);
+        S.outcome.(test).sub_ids = S.outcome.(test).sub_ids(~nan_idx);
         
-            
+        disp(['removed ', num2str(sum(nan_idx)), ' empty cells'])
         
-    end
+    end  
+        
 end
+
+
 
         
         
