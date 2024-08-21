@@ -146,7 +146,7 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.mask; % TODO: brain mask or mask?
+    results.study_info.brain_mask = S.study_info.brain_mask; % TODO: brain mask or mask?
     
     % infer what type of test it is...
     
@@ -213,6 +213,31 @@ for i = 1:length(tests)
         results.study_info.test_components = {condition, score_label};
         results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
             % TODO: remove 'test'
+        
+        % only keep subjects that have brain data, motion, and score
+        overlap_brain_motion = intersect(S.brain_data.(condition).sub_ids, S.brain_data.(condition).sub_ids_motion);
+        overlap_all = intersect(overlap_brain_motion, S.outcome.(test).sub_ids);
+        brain_sub_index = ismember(S.brain_data.(condition).sub_ids, overlap_all);
+        m = m(brain_sub_index,:);
+        brain_ids = S.brain_data.(condition).sub_ids(brain_sub_index);
+        score_sub_index = ismember(S.outcome.(test).sub_ids, overlap_all);
+        score = score(score_sub_index);
+        score_ids = S.outcome.(test).sub_ids(score_sub_index);
+        motion_sub_index = ismember(S.brain_data.(condition).sub_ids_motion, overlap_all);
+        motion = motion(motion_sub_index);
+        motion_ids = S.brain_data.(condition).sub_ids_motion(motion_sub_index);
+        
+        % make sure brain data, motion, and score are in the same order of
+        % subjects
+        % create index for reordering each data
+        [~, brain_idx] = ismember(overlap_all, brain_ids);
+        [~, score_idx] = ismember(overlap_all, score_ids);
+        [~, motion_idx] = ismember(overlap_all, motion_ids);
+        % reorder
+        m = m(brain_idx);
+        score = score(score_idx);
+        motion = motion(motion_idx);
+       
     end
     
     %TODO: 
@@ -241,6 +266,47 @@ for i = 1:length(tests)
         % we have two motion variables here because motion is different for
         % each run! TODO: decide how to use this...
         
+        % only keep subjects that have both conditions brain data, 
+        % both motion, and score
+        overlap_all = intersect(S.brain_data.(condition1).sub_ids, S.brain_data.(condition2).sub_ids);
+        % overlap_both_motion = intersect(S.brain_data.(condition1).sub_ids_motion, S.brain_data.(condition2).sub_ids_motion);
+        %overlap_conds_motion = intersect(overlap_both_conds, overlap_both_motion);
+        %overlap_all = intersect(overlap_both_conds, S.outcome.(test).sub_ids);
+        
+        % brain data (condition1)
+        cond1_sub_index = ismember(S.brain_data.(condition1).sub_ids, overlap_all);
+        m = m(cond1_sub_index,:);
+        cond1_ids = S.brain_data.(condition1).sub_ids(cond1_sub_index);
+        % other brain data (called score for now, TODO: might change)
+        cond2_sub_index = ismember(S.brain_data.(condition2).sub_ids, overlap_all);
+        score = score(cond2_sub_index,:);
+        cond2_ids = S.brain_data.(condition2).sub_ids(cond2_sub_index);
+        % motion from first condition 
+        % motion1_sub_index = ismember(S.brain_data.(condition1).sub_ids_motion, overlap_all);
+        motion1 = motion1(cond1_sub_index,:);
+        motion1_ids = S.brain_data.(condition1).sub_ids(cond1_sub_index);
+        % motion from second condition (score)
+        % motion2_sub_index = ismember(S.brain_data.(condition2).sub_ids_motion, overlap_all);
+        motion2 = motion2(cond2_sub_index,:);
+        motion2_ids = S.brain_data.(condition2).sub_ids(cond2_sub_index);
+        
+        % make sure brain data, motion, and score are in the same order of
+        % subjects
+        % create index for reordering each data
+        [~, cond1_idx] = ismember(overlap_all, cond1_ids);
+        [~, cond2_idx] = ismember(overlap_all, cond2_ids);
+        [~, motion1_idx] = ismember(overlap_all, motion1_ids);
+        [~, motion2_idx] = ismember(overlap_all, motion2_ids);
+        
+        % reorder
+        m = m(cond1_idx);
+        score = score(cond2_idx);
+        motion1 = motion1(motion1_idx);
+        motion2 = motion2(motion2_idx);
+        
+        % now m, score, motion1, and motion2, should all be the same length
+        % (have the same subjects in the same order)
+        
         results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
     end
     
@@ -259,7 +325,9 @@ for i = 1:length(tests)
             m1 = S.brain_data.(condition1).data;
             m2 = S.brain_data.(condition2).data;
             m = cat(2, m1, m2); %TODO: build in a check for dimensions
-            % creating the dummy variable as 'score'
+            cond1_ids = S.brain_data.(condition1).sub_ids;
+            cond2_ids = S.brain_data.(condition2).sub_ids;
+            both_cond_ids = cat(1, cond1_ids, cond2_ids);
             
             % make sure the dims of m are subs x parcels
             if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
@@ -267,11 +335,12 @@ for i = 1:length(tests)
                 % flip dimensions
                 m = m';
             end
-        
+            
+            % creating the dummy variable as 'score'
             score = categorical(cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1))); %TODO: test
             motion1 = S.brain_data.(condition1).motion;
             motion2 = S.brain_data.(condition2).motion;
-            motion = cat(1, motion1, motion2); % TODO: check table data type
+            motion = cat(1, motion1, motion2); 
             
             results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
 
@@ -293,9 +362,13 @@ for i = 1:length(tests)
         end
 
     end
-    % TODO: analyze the data
+    
     % TODO: intersection between brain data subs and score subs
-    % TODO: remove nans in checker
+    % remove data from subjects that are missing either score, motion, or
+    % brain data
+    % 1. create a subject list of subs with all three variables
+    % 2. remove subjects not in that list from all three variables
+    
 
     for do_pooling = pooling_params
 

@@ -15,7 +15,7 @@
 
 % load data
 data_path = '/work/neuroprism/effect_size/data/subject_level/';
-data_filename = 's_hcp_act_noble_1.mat';
+data_filename = 's_abcd_fc_rosenblatt.mat';
 
 S = load([data_path, data_filename]);
 
