@@ -65,12 +65,16 @@ regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multip
 
 % pooling_params = [0,1]; %TODO: for now set pooling_params to 0 because
 % UKB data
-pooling_params = [0];
+pooling_params = [0, 1];
 motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 
 % set paths
+
+
+
+
 
 %addpath(data_loader_script_path); % USER-DEFINED
 addpath(genpath(atlas_tools_script_path));

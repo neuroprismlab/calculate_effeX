@@ -7,11 +7,10 @@ function test_type = infer_test_type(S, test)
     
     % if the score is continuous, test_type is r
     if isa(S.outcome.(test).score, 'double') && length(unique(S.outcome.(test).score)) > 2
-        % length(unique(S.outcome.(test).score(~cellfun(@isempty, strtrim(S.outcome.(test).score))))) > 2
         test_type = 'r';
     end
     
-    % if a contrast is provided, either t or t2
+    % if a contrast is provided, test_type is either t or t2
     if iscell(S.outcome.(test).contrast)
         if ~isnan(S.outcome.(test).contrast{1})
             % if brain_data sub IDs are repeated for conditions 1 and 2, test

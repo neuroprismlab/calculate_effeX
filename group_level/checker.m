@@ -21,6 +21,7 @@
 
 % turn checker into a function that takes a subject-level dataset S
 % returns a checked and cleaned dataset S
+
 function S = checker(S)
 
     % check that motion is an array
@@ -101,17 +102,6 @@ function S = checker(S)
                 disp([test, ' has more than 2 unique levels (and not numeric). Removing it'])
                 S.outcome = rmfield(S.outcome,test);
             end
-
-
-    %         
-    %         try 
-    %             S.outcome.(test).score = convertCharsToStrings(S.outcome.(test).score);
-    %             disp([test, ' changed to string array and saved'])
-    %            
-    %         catch 
-    %             S.outcome = rmfield(S.outcome,test);
-    %             disp(['could not transform ', test, ' to a matrix. ', test, 'reremoved.'])
-    %         end
 
         elseif isa(S.outcome.(test).score, 'categorical')
             nan_idx = isundefined(S.outcome.(test).score);
