@@ -179,7 +179,7 @@ for i = 1:length(tests)
         % save contrast to results
         results.study_info.test_components = {condition, score_label};
         results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
-            % TODO: remove 'hstest' after testing done
+        % TODO: remove 'hstest' after testing done
         
         % remove missing subject data
         [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
@@ -194,6 +194,9 @@ for i = 1:length(tests)
         condition2 = S.outcome.(test).contrast{2};
         m = S.brain_data.(condition1).data;
         % m is the brain data for the first condition
+        
+        % save contrast to results
+        results.study_info.test_components = {condition1, condition2};
         
         % make sure the dims of m are subs x parcels
         if size(m,2) == length(S.brain_data.(condition).sub_ids)
@@ -237,6 +240,10 @@ for i = 1:length(tests)
             cond2_ids = S.brain_data.(condition2).sub_ids;
             both_cond_ids = cat(1, cond1_ids, cond2_ids);
             
+            % save contrast to results
+            results.study_info.test_components = {condition1, condition2};
+        
+            
             % make sure the dims of m are subs x parcels
             if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
                 % if the second dimension is subjects,
@@ -256,6 +263,11 @@ for i = 1:length(tests)
             condition = S.outcome.(test).reference_condition;
             m = S.brain_data.(condition).data;
              
+            score_label = S.outcome.(test).score_label;
+            
+            % save contrast to results
+            results.study_info.test_components = {condition, score_label};
+        
             % make sure the dims of m are subs x parcels
             if size(m,2) == length(S.brain_data.(condition).sub_ids)
                 % if the second dimension is subjects,
