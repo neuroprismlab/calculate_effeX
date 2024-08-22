@@ -45,7 +45,6 @@ for i = 1:length(tests)
     
     % check cell arrays
     if iscell(S.outcome.(test).score)
-        % if it's character array and there are more than two unique, discard
         
         % remove empty and NaN cells
         emptyCells = cellfun(@isempty, S.outcome.(test).score);
@@ -67,6 +66,11 @@ for i = 1:length(tests)
         if all(cellfun(@isnumeric, S.outcome.(test).score))
             S.outcome.(test).score = cell2mat(S.outcome.(test).score);
             disp([test, ' converted from cell to numeric array'])
+            
+            % TODO: figure out how to account for the case when there could
+            % be 0s, 1s, and 2s (3 levels). Would be cell with numbers, but
+            % not continuous, so more like an ANOVA and this isn't
+            % accounted for currently. Have not seen in the data though.
         
         % if there are only two unique values, change to zeros and ones
         elseif length(unique(S.outcome.(test).score)) == 2

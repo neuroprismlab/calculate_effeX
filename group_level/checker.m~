@@ -15,7 +15,7 @@
 
 % load data
 data_path = '/work/neuroprism/effect_size/data/subject_level/';
-data_filename = 's_hcp_fc_noble_corr.mat';
+data_filename = 's_abcd_fc_rosenblatt.mat';
 
 S = load([data_path, data_filename]);
 
@@ -45,7 +45,6 @@ for i = 1:length(tests)
     
     % check cell arrays
     if iscell(S.outcome.(test).score)
-        % if it's character array and there are more than two unique, discard
         
         % remove empty and NaN cells
         emptyCells = cellfun(@isempty, S.outcome.(test).score);
@@ -67,6 +66,11 @@ for i = 1:length(tests)
         if all(cellfun(@isnumeric, S.outcome.(test).score))
             S.outcome.(test).score = cell2mat(S.outcome.(test).score);
             disp([test, ' converted from cell to numeric array'])
+            
+            % TODO: figure out how to account for the case when there could
+            % be 0s, 1s, and 2s (3 levels). Would be cell with numbers, but
+            % not continuous, so more like an ANOVA and this isn't
+            % accounted for currently. Have not seen in the data though.
         
         % if there are only two unique values, change to zeros and ones
         elseif length(unique(S.outcome.(test).score)) == 2
@@ -86,6 +90,9 @@ for i = 1:length(tests)
             % transform from cell array to matrix
             S.outcome.(test).score = cell2mat(S.outcome.(test).score);
             disp([test, ' converted from cell to numeric array'])
+            
+            % save level_map
+            S.outcome.(test).level_map = level_map;
             
         elseif length(unique(S.outcome.(test).score)) > 2
             disp([test, ' has more than 2 unique levels (and not numeric). Removing it'])
@@ -122,9 +129,17 @@ for i = 1:length(tests)
                 key_name = ['key_', num2str(key)];
                 level_map.(key_name).key = key;
                 level_map.(key_name).value = values(idx);
-                S.outcome.(test).score(cellfun(@(x) strcmp(x, values{idx}), S.outcome.(test).score)) = {key};
             end
+            S.outcome.(test).score = double(ismember(S.outcome.(test).score, values(2)));
             disp([test, ' has two levels. Converted to binary.'])
+            
+            % save level_map
+            S.outcome.(test).level_map = level_map;
+       
+        elseif length(unique(S.outcome.(test).score)) > 2
+            disp([test, ' has more than 2 unique levels (and not numeric). Removing it'])
+            S.outcome = rmfield(S.outcome,test);
+        end
         
         
     else 
@@ -138,6 +153,8 @@ for i = 1:length(tests)
     end  
         
 end
+
+
 
         
         

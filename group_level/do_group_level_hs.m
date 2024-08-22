@@ -493,68 +493,22 @@ function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
     % X is brain data, y is score, X2 is motion
     n = length(y);
     std_X = std(X);
+    std_y = std(y);
     
-    % only calculate std_y if y is double, otherwise std_y = NaN
-    if isa(y, 'double')
-        %disp(['y is double, so calculating std_y'])
-        std_y = std(y, 'omitnan');
-        %disp(['std_y is ', std_y])
-    else
-        %disp(['y is not double, so std_y set to NaN'])
-        std_y = NaN;
-    end
-    
-    if nargin==3 % regressing score and motion
-        
-        % if score is categorical with two options
-        if iscategorical(y) && length(rmmissing(unique(y))) == 2
-            
-            % convert categorical to logical
-            levels = rmmissing(unique(y));
-            level_1 = levels(1);
-            y_logical = y == level_1;
+    if nargin==3 % regress score and motion
             
             % for each brain variable, perform regression
             for i=1:size(X,2)
-                mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y_logical, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
-            end
-            
-            b = squeeze(mdl(2,1,:))'; % unstandardized betas
-            r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
-            p = squeeze(mdl(2,2,:))';
-        
-        else
-       
-            for i=1:size(X,2)
                 mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
             end
+            
             b = squeeze(mdl(2,1,:))'; % unstandardized betas
             r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
             p = squeeze(mdl(2,2,:))';
-        end
-        
+       
     elseif nargin==2 % regress brain data with score
-        % TODO: only keep subjects that have both score and brain data
-        
-        % if score (y) is categorical, do t2 with point biserial
-        % correlation by converting y to logical (ASK STEPH)
-        if iscategorical(y) && length(rmmissing(unique(y))) == 2
-            % convert categorical to logical
-            levels = rmmissing(unique(y));
             
-            level_1 = levels(1);
-            y_logical = y == level_1;
-            
-            [r, p] = corr(X,y_logical);
-            
-        elseif iscategorical(y)
-            error('Categorical score with more or less than 2 unique values')
-            % in future could do something like an ANOVA for more than 2?
-            
-        elseif isa(y, 'double')
-            [r,p] = corr(X,y);
-            
-        end
+            [r, p] = corr(X,y);
             
     else
         error('%d arguments provided but only 2 or 3 allowed.',nargin)
