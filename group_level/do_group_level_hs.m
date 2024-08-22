@@ -122,9 +122,9 @@ addpath(regression_fast_script_path);
 %this_score='age';
 
 S = load(data_filename);
-% m = S.brain_data; % don't load this yet, load when required by contrast
-% score = S.(this_score); % age, fluid intelligence, gender
-% sub_motion = S.('framewise displacement');
+
+% run checker on data
+S = checker(S);
 
 
 % create a struct to store the results 
@@ -146,7 +146,7 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.brain_mask; % TODO: brain mask or mask?
+    results.study_info.brain_mask = S.study_info.mask; % TODO: brain mask or mask?
     
     % infer what type of test it is...
     
@@ -234,7 +234,7 @@ for i = 1:length(tests)
         [~, score_idx] = ismember(overlap_all, score_ids);
         [~, motion_idx] = ismember(overlap_all, motion_ids);
         % reorder
-        m = m(brain_idx);
+        m = m(brain_idx,:);
         score = score(score_idx);
         motion = motion(motion_idx);
        
@@ -299,7 +299,7 @@ for i = 1:length(tests)
         [~, motion2_idx] = ismember(overlap_all, motion2_ids);
         
         % reorder
-        m = m(cond1_idx);
+        m = m(cond1_idx,:);
         score = score(cond2_idx);
         motion1 = motion1(motion1_idx);
         motion2 = motion2(motion2_idx);
@@ -355,19 +355,40 @@ for i = 1:length(tests)
                 m = m';
             end
             
-            score = categorical(S.outcome.(test).score);
+            score = S.outcome.(test).score;
             motion = S.brain_data.(condition).motion;
-            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
+            
+            % only keep subjects with brain data, score, and motion
+            % only keep subjects that have brain data, motion, and score
+            overlap_brain_motion = intersect(S.brain_data.(condition).sub_ids, S.brain_data.(condition).sub_ids_motion);
+            overlap_all = intersect(overlap_brain_motion, S.outcome.(test).sub_ids);
+            brain_sub_index = ismember(S.brain_data.(condition).sub_ids, overlap_all);
+            m = m(brain_sub_index,:);
+            brain_ids = S.brain_data.(condition).sub_ids(brain_sub_index);
+            
+            score_sub_index = ismember(S.outcome.(test).sub_ids, overlap_all);
+            score = score(score_sub_index);
+            score_ids = S.outcome.(test).sub_ids(score_sub_index);
+            
+            motion_sub_index = ismember(S.brain_data.(condition).sub_ids_motion, overlap_all);
+            motion = motion(motion_sub_index);
+            motion_ids = S.brain_data.(condition).sub_ids_motion(motion_sub_index);
 
+            % make sure brain data, motion, and score are in the same order of
+            % subjects
+            % create index for reordering each data
+            [~, brain_idx] = ismember(overlap_all, brain_ids);
+            [~, score_idx] = ismember(overlap_all, score_ids);
+            [~, motion_idx] = ismember(overlap_all, motion_ids);
+            % reorder
+            m = m(brain_idx,:);
+            score = score(score_idx);
+            motion = motion(motion_idx);
+            
+            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
         end
 
     end
-    
-    % TODO: intersection between brain data subs and score subs
-    % remove data from subjects that are missing either score, motion, or
-    % brain data
-    % 1. create a subject list of subs with all three variables
-    % 2. remove subjects not in that list from all three variables
     
 
     for do_pooling = pooling_params
@@ -445,10 +466,8 @@ for i = 1:length(tests)
 
             if strcmp(motion_method,'regression')
                 % include motion as a confound
-                disp(['running regression, datatype of score2 is ', class(score2)])
                 [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2, motion);
             else
-                disp(['running not regression, datatype of score2 is', class(score2)])
                 [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2);
             end
             results.data.(result_name).r = r;

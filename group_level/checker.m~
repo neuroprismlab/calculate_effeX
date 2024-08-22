@@ -14,10 +14,10 @@
 % if it's a cell, convert to array
 
 % load data
-data_path = '/work/neuroprism/effect_size/data/subject_level/';
-data_filename = 's_abcd_fc_rosenblatt.mat';
-
-S = load([data_path, data_filename]);
+% data_path = '/work/neuroprism/effect_size/data/subject_level/';
+% data_filename = 's_abcd_fc_rosenblatt.mat';
+% 
+% S = load([data_path, data_filename]);
 
 
 % check that motion is an array

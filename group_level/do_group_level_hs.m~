@@ -122,9 +122,9 @@ addpath(regression_fast_script_path);
 %this_score='age';
 
 S = load(data_filename);
-% m = S.brain_data; % don't load this yet, load when required by contrast
-% score = S.(this_score); % age, fluid intelligence, gender
-% sub_motion = S.('framewise displacement');
+
+% run checker on data
+S = checker(S);
 
 
 % create a struct to store the results 
@@ -146,7 +146,7 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.brain_mask; % TODO: brain mask or mask?
+    results.study_info.brain_mask = S.study_info.mask; % TODO: brain mask or mask?
     
     % infer what type of test it is...
     
@@ -362,12 +362,6 @@ for i = 1:length(tests)
         end
 
     end
-    
-    % TODO: intersection between brain data subs and score subs
-    % remove data from subjects that are missing either score, motion, or
-    % brain data
-    % 1. create a subject list of subs with all three variables
-    % 2. remove subjects not in that list from all three variables
     
 
     for do_pooling = pooling_params
