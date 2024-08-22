@@ -47,7 +47,7 @@ scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts
 %scripts_dir = '/home/USERNAME/scripts/effect_size/';
 results_dir = '/work/neuroprism/effect_size/data/group_level/';
 %data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624
-data_filename = '/work/neuroprism/effect_size/data/subject_level/s_ukb_fc_jiang.mat';
+data_filename = '/work/neuroprism/effect_size/data/subject_level/s_abcd_fc_rosenblatt.mat';
 
 
 % motion paths - USER-DEFINED - REMOVED 051624
@@ -134,9 +134,6 @@ S = checker(S);
 
 tests = fieldnames(S.outcome);
 
-% TEMPORARY TESTING 
-%tests = cell({'test3'});
-
 for i = 1:length(tests)
     % for each outcome...
     test = tests{i}; % get the name of the outcome/score
@@ -146,52 +143,22 @@ for i = 1:length(tests)
     results.study_info.dataset = S.study_info.dataset;
     results.study_info.test = S.study_info.test;
     results.study_info.map = S.study_info.map;
-    results.study_info.brain_mask = S.study_info.mask; % TODO: brain mask or mask?
-    
-    % infer what type of test it is...
-    
-    % if score is continuous, then test is r
-    % STEPH: is there a better matlab way to check if continuous?
-    if isa(S.outcome.(test).score, 'double') && length(unique(S.outcome.(test).score)) > 2
-        % length(unique(S.outcome.(test).score(~cellfun(@isempty, strtrim(S.outcome.(test).score))))) > 2
-        test_type = 'r';
+    results.study_info.mask = S.study_info.mask; % TODO: make sure all input is mask not brain_mask
+    if isfield(S.outcome.(test), 'level_map')
+        results.study_info.level_map = S.outcome.(test).level_map;
     end
-   
-    % if provided a contrast, check sub IDs to determine test type
-    if iscell(S.outcome.(test).contrast)
-        if ~isnan(S.outcome.(test).contrast{1})
-            % if brain_data sub IDs are repeated for conditions 1 and 2, test
-            % is t
-            condition1 = S.outcome.(test).contrast{1};
-            condition2 = S.outcome.(test).contrast{2};
-            if ~isempty(intersect(S.brain_data.(condition1).sub_ids, S.brain_data.(condition2).sub_ids))
-                test_type = 't';
-                % TODO: currently will say t if even just one sub ID is
-                % repeated across conditions. I think this is okay - steph?
-            else
-                test_type = 't2';
-            end
-        end
-    end
+        
     
-    % if not provided a contrast, infer based on sub IDs of score
-    % score should be binary
-    if length(unique(S.outcome.(test).score)) == 2
-        % S.outcome.(test).score has one score per subject in sub_ids
-        % check if there are duplicates in subject ids, this would suggest
-        % that it is t2. if no duplicates, then test is t
-        if length(unique(S.outcome.(test).sub_ids)) == length(S.outcome.(test).sub_ids)
-            test_type = 't2';
-            
-        else
-            test_type = 't';
-        end
-    end
+    test_type = infer_test_type(S, test);
     
+    if strcmp(test_type, 'unknown')
+        error(['could not infer test type for test ', test])
+    end
             
     if test_type == 'r'
         % if study is r, then grab the reference_condition
         condition = S.outcome.(test).reference_condition;
+        
         % use the reference condition as idx to grab ref brain data
         m = S.brain_data.(condition).data;
         
@@ -202,41 +169,20 @@ for i = 1:length(tests)
             m = m';
         end
             
-        % m contains brain data as number of subs x number of parcels
+        % get score data
         score = S.outcome.(test).score;
         score_label = S.outcome.(test).score_label;
-        % score contains one score per subject to correlate with brain data
-        % TODO: check that score and m contain the same subs?
+      
+        % get motion data
         motion = S.brain_data.(condition).motion;
-        % TODO: check that motion has same subs as score and m?
+        
         % save contrast to results
         results.study_info.test_components = {condition, score_label};
         results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
-            % TODO: remove 'test'
+            % TODO: remove 'hstest' after testing done
         
-        % only keep subjects that have brain data, motion, and score
-        overlap_brain_motion = intersect(S.brain_data.(condition).sub_ids, S.brain_data.(condition).sub_ids_motion);
-        overlap_all = intersect(overlap_brain_motion, S.outcome.(test).sub_ids);
-        brain_sub_index = ismember(S.brain_data.(condition).sub_ids, overlap_all);
-        m = m(brain_sub_index,:);
-        brain_ids = S.brain_data.(condition).sub_ids(brain_sub_index);
-        score_sub_index = ismember(S.outcome.(test).sub_ids, overlap_all);
-        score = score(score_sub_index);
-        score_ids = S.outcome.(test).sub_ids(score_sub_index);
-        motion_sub_index = ismember(S.brain_data.(condition).sub_ids_motion, overlap_all);
-        motion = motion(motion_sub_index);
-        motion_ids = S.brain_data.(condition).sub_ids_motion(motion_sub_index);
-        
-        % make sure brain data, motion, and score are in the same order of
-        % subjects
-        % create index for reordering each data
-        [~, brain_idx] = ismember(overlap_all, brain_ids);
-        [~, score_idx] = ismember(overlap_all, score_ids);
-        [~, motion_idx] = ismember(overlap_all, motion_ids);
-        % reorder
-        m = m(brain_idx,:);
-        score = score(score_idx);
-        motion = motion(motion_idx);
+        % remove missing subject data
+        [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
        
     end
     
@@ -266,46 +212,8 @@ for i = 1:length(tests)
         % we have two motion variables here because motion is different for
         % each run! TODO: decide how to use this...
         
-        % only keep subjects that have both conditions brain data, 
-        % both motion, and score
-        overlap_all = intersect(S.brain_data.(condition1).sub_ids, S.brain_data.(condition2).sub_ids);
-        % overlap_both_motion = intersect(S.brain_data.(condition1).sub_ids_motion, S.brain_data.(condition2).sub_ids_motion);
-        %overlap_conds_motion = intersect(overlap_both_conds, overlap_both_motion);
-        %overlap_all = intersect(overlap_both_conds, S.outcome.(test).sub_ids);
-        
-        % brain data (condition1)
-        cond1_sub_index = ismember(S.brain_data.(condition1).sub_ids, overlap_all);
-        m = m(cond1_sub_index,:);
-        cond1_ids = S.brain_data.(condition1).sub_ids(cond1_sub_index);
-        % other brain data (called score for now, TODO: might change)
-        cond2_sub_index = ismember(S.brain_data.(condition2).sub_ids, overlap_all);
-        score = score(cond2_sub_index,:);
-        cond2_ids = S.brain_data.(condition2).sub_ids(cond2_sub_index);
-        % motion from first condition 
-        % motion1_sub_index = ismember(S.brain_data.(condition1).sub_ids_motion, overlap_all);
-        motion1 = motion1(cond1_sub_index,:);
-        motion1_ids = S.brain_data.(condition1).sub_ids(cond1_sub_index);
-        % motion from second condition (score)
-        % motion2_sub_index = ismember(S.brain_data.(condition2).sub_ids_motion, overlap_all);
-        motion2 = motion2(cond2_sub_index,:);
-        motion2_ids = S.brain_data.(condition2).sub_ids(cond2_sub_index);
-        
-        % make sure brain data, motion, and score are in the same order of
-        % subjects
-        % create index for reordering each data
-        [~, cond1_idx] = ismember(overlap_all, cond1_ids);
-        [~, cond2_idx] = ismember(overlap_all, cond2_ids);
-        [~, motion1_idx] = ismember(overlap_all, motion1_ids);
-        [~, motion2_idx] = ismember(overlap_all, motion2_ids);
-        
-        % reorder
-        m = m(cond1_idx,:);
-        score = score(cond2_idx);
-        motion1 = motion1(motion1_idx);
-        motion2 = motion2(motion2_idx);
-        
-        % now m, score, motion1, and motion2, should all be the same length
-        % (have the same subjects in the same order)
+        % remove missing subject data
+        [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
         
         results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
     end
@@ -358,32 +266,8 @@ for i = 1:length(tests)
             score = S.outcome.(test).score;
             motion = S.brain_data.(condition).motion;
             
-            % only keep subjects with brain data, score, and motion
-            % only keep subjects that have brain data, motion, and score
-            overlap_brain_motion = intersect(S.brain_data.(condition).sub_ids, S.brain_data.(condition).sub_ids_motion);
-            overlap_all = intersect(overlap_brain_motion, S.outcome.(test).sub_ids);
-            brain_sub_index = ismember(S.brain_data.(condition).sub_ids, overlap_all);
-            m = m(brain_sub_index,:);
-            brain_ids = S.brain_data.(condition).sub_ids(brain_sub_index);
-            
-            score_sub_index = ismember(S.outcome.(test).sub_ids, overlap_all);
-            score = score(score_sub_index);
-            score_ids = S.outcome.(test).sub_ids(score_sub_index);
-            
-            motion_sub_index = ismember(S.brain_data.(condition).sub_ids_motion, overlap_all);
-            motion = motion(motion_sub_index);
-            motion_ids = S.brain_data.(condition).sub_ids_motion(motion_sub_index);
-
-            % make sure brain data, motion, and score are in the same order of
-            % subjects
-            % create index for reordering each data
-            [~, brain_idx] = ismember(overlap_all, brain_ids);
-            [~, score_idx] = ismember(overlap_all, score_ids);
-            [~, motion_idx] = ismember(overlap_all, motion_ids);
-            % reorder
-            m = m(brain_idx,:);
-            score = score(score_idx);
-            motion = motion(motion_idx);
+            % remove missing subject data
+            [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
             
             results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
         end
