@@ -1,5 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Effect maps created by Rongtao + Stephanie
+%
+% Calculate group-level statistics
+% Authors: Hallee Shearer & Stephanie Noble
 %
 % Prereqs:
 %   - [any unique parameters to set or scripts to run beforehand]
@@ -15,15 +17,15 @@
 %       - <test_components> (e.g., {'condition_label', 'score_label'}
 %       - map
 %       - test
-%       - brain_mask
+%       - mask % TODO: there will be one for each brain condition
 %       - category
 %   - data
 %       - <pooling strategy>
 %            - <motion strategy>
-%                 - r
+%                 - b_standardized
 %                 - p
-%                 - std_X
-%                 - std_y
+%                 - std_brain
+%                 - std_score
 %                 - n         ------------ NaN if two-sample
 %                 - n1        ------------ NaN if one-sample
 %                 - n2        ------------ NaN if one-sample
@@ -362,19 +364,21 @@ for i = 1:length(tests)
                
             end
 
+
             %% Run regression
 
             if strcmp(motion_method,'regression')
                 % include motion as a confound
-                [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2, motion);
+                [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2,motion);
             else
-                [r,p,n,std_X,std_y] = save_univariate_regression_results(m2,score2);
+                [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2);
             end
+    
             results.data.(result_name).r = r;
             results.data.(result_name).p = p;
             results.data.(result_name).n = n;
-            results.data.(result_name).std_X = std_X;
-            results.data.(result_name).std_y = std_y;
+            results.data.(result_name).std_brain = std_brain;
+            results.data.(result_name).std_score = std_score;
             
 
         end
@@ -401,42 +405,64 @@ end
 % set up function for univariate y~x with optional confound as predictor
 
 % NOTE: it may be tempting to use a stepwise procedure - estimate the residuals of m ~ motion, then use those residuals for subsequently estimating betas - but residualizing in this way biases effect size estimates towards zero (i.e., conservative), particularly with higher collinearity in predictors. Instead, including the confound in the actual model should be preferred as unbiased (though also note higher variance with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x
-%   i.e., avoid: mdl = fitlm(X, confound); X = mdl.Residuals;
+%   i.e., avoid: mdl = fitlm(brain, confound); brain = mdl.Residuals;
 
-% TODO: either convert the above to point-biserial correlation coefficient or t-statistic or add a function to calculate these
 
-% separate function first that 
-
-function [r,p,n,std_X,std_y] = save_univariate_regression_results(X,y,X2)
-    % X: n_sub x n_var, y: n_sub x 1, Optional X2: n_sub x n_var
-    % X is brain data, y is score, X2 is motion
-    n = length(y);
-    std_X = std(X);
-    std_y = std(y);
+function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,brain,score,confounds)
+    % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
+    % brain is brain data, score is score, confounds is motion
+   
+    n = size(brain,2);
+    std_brain = std(brain);
+    std_score = std(score);
     
-    if nargin==3 % regress score and motion
-            
-            % for each brain variable, perform regression
-            for i=1:size(X,2)
-                mdl(:,:,i) = Regression_fast([ones(n,1),X(:,i),X2], y, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
-            end
-            
-            b = squeeze(mdl(2,1,:))'; % unstandardized betas
-            r = b.*std_X / std_y; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
-            p = squeeze(mdl(2,2,:))';
-       
-    elseif nargin==2 % regress brain data with score
-            
-            [r, p] = corr(X,y);
-            
-    else
-        error('%d arguments provided but only 2 or 3 allowed.',nargin)
+    if nargin==3
+        confounds=[];
+    elseif ~nargin==4
+        error('%d arguments provided but only 3 or 4 allowed.',nargin)
+    end
+   
+    % adjust design and which coefficient results to extract based on test type
+    if test_type=='corr'
+        do_t_test=0;
+        test_beta=2;
+    elseif test_type=='t2'
+        do_t_test=1;
+        test_beta=2;
+    elseif test_type=='t1'
+        do_t_test=1;
+        test_beta=1;
+        score=[]; % because score is just single group ID, but we already have this in the intercept
+        std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result
+    end
         
+    % Run regression across each brain variable
+
+    if do_t_test
+        
+        % design matrix representing group ID or intercept is predictor - standard design for t-test 
+        for i=1:size(brain,2)
+            mdl(:,:,i) = Regression_fast([ones(n,1),score,confounds], brain(:,i), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+        end
+    
+    else
+
+        % score is outcome - standard design for correlation
+        for i=1:size(brain,2)
+            mdl(:,:,i) = Regression_fast([ones(n,1),brain(:,i),confounds], score, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            % same results without covariate: [r, p] = corr(brain,score);
+        end
+   
     end
     
-    % TODO: the dimensions are flipped between the output from no motion
-    % and from motion regression the way this is now
-    
-    % save([results_file_prefix,'.mat'],'r','p','std_X','std_y','n')
+    b = squeeze(mdl(test_beta,1,:))'; % unstandardized betas
+    p = squeeze(mdl(test_beta,2,:))';
+    if do_t_test
+        b_standardized = b .* std_score ./ std_brain; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
+    else
+        b_standardized = b .* std_brain ./ std_score; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
+    end
+            
+    % save([results_file_prefix,'.mat'],'b_standardized','p','std_brain','std_score','n')
 end
 
