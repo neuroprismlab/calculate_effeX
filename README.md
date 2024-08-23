@@ -1,18 +1,18 @@
 # calculate_effeX
-Calculate effect size precursors to effect size explorer
+Calculate effect size results across studies for BrainEffeX
 
 ## 3 steps: subject_level, group_level, combine_gl
 
 ### subject_level
-Takes subject-level data from contributors
-Computes stat maps at the group level for each "study"
+Input: subject-level statistical maps from contributors
+<br>Computes group-level stat maps for each "study"
 
 ### group_level
-Takes group level stat map from a "study"
-Calculates effect maps for the "study"
+Input: group-level statistical maps for each "study"
+<br>Calculates effect sizes & other descriptive data for each "study"
 
 
 ### combine_gl
-Takes all group level effect maps and "study" details
-Creates combined data in the format to feed into BrainEffeX
+Input: All group level effect size-related data  and "study" details
+<br>Combines and formats data for BrainEffeX
 

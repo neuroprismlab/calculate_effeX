@@ -1,6 +1,6 @@
 # add phenotypic categories to study dataframe
 
-add_phen <- function(study, effect_maps, phen_file = "phen.csv", data_dir = "data/", output_file = "phen_study.RData") {
+add_phen <- function(study, effect_maps, phen_file = "phen.csv", data_dir = "combine_gl/data/", output_file = "phen_study.RData") {
     # load phenotypic data file (phen_file) from data directory
     phen <- read.csv(paste0(data_dir, phen_file), header = TRUE)
     # merge phenotypic data with study data
