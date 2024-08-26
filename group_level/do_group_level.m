@@ -49,13 +49,22 @@ scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts
 %scripts_dir = '/home/USERNAME/scripts/effect_size/';
 results_dir = '/work/neuroprism/effect_size/data/group_level/';
 %data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624
-data_filename = '/work/neuroprism/effect_size/data/subject_level/s_abcd_fc_rosenblatt.mat';
+data_dir = '/work/neuroprism/effect_size/data/subject_level/';
+
+% create a list of files in data_dir to loop through:
+filenames = dir(data_dir);
+filenames = filenames(~[filenames.isdir]);  % Remove directories from the list
 
 
-% motion paths - USER-DEFINED - REMOVED 051624
+% store the names of all datasets to loop through
+datasets = {filenames.name}; 
+% datasets(1:3) = [];
+%TMP: testing
+datasets= {'s_ukb_fc_jiang.mat'};
 
-%motion_file = [motion_dir,'EXAMPLEPATH_allsubs_Movement_RelativeRMS_mean.txt'];
-%motion_subids_file = [motion_dir,'subids']; % subject IDs for motion measurements
+% results prefix for testing (will be appended to the start of each result
+% file
+res_prefix = 'testing';
 
 % script paths
 
@@ -63,20 +72,21 @@ data_filename = '/work/neuroprism/effect_size/data/subject_level/s_abcd_fc_rosen
 atlas_tools_script_path = [scripts_dir,'atlas_tools']; % for pooling (structure_data, summarize_data)
 regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multiple regression
 
+
 % params
 
-% pooling_params = [0,1]; %TODO: for now set pooling_params to 0 because
-% UKB data
-pooling_params = [0, 1];
+% if ukb data, pooling_params = [0] because we don't have a map
+% TMP: change this once we have a ukb map
+if contains(datasets, "ukb")
+    pooling_params = [0];
+else
+    pooling_params = [0, 1];
+end
 motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 
 % set paths
-
-
-
-
 
 %addpath(data_loader_script_path); % USER-DEFINED
 addpath(genpath(atlas_tools_script_path));
@@ -127,265 +137,285 @@ addpath(regression_fast_script_path);
 
 %this_score='age';
 
-S = load(data_filename);
 
-% run checker on data
-S = checker(S);
-
-
-% create a struct to store the results 
-% results struct will have one struct for each contrast
-% each contrast struct will have one struct for each combination of pooling
-% and motion regression
-
-tests = fieldnames(S.outcome);
-
-for i = 1:length(tests)
-    % for each outcome...
-    test = tests{i}; % get the name of the outcome/score
-    disp(['running: ', test])
+for i = 1:length(datasets)
+   
+    dataset = datasets{i};
+    disp(['running dataset: ',dataset])
     
-    results = []; % clear the struct from prior loops
-    results.study_info.dataset = S.study_info.dataset;
-    results.study_info.test = S.study_info.test;
-    results.study_info.map = S.study_info.map;
-    results.study_info.mask = S.study_info.mask; % TODO: make sure all input is mask not brain_mask
-    if isfield(S.outcome.(test), 'level_map')
-        results.study_info.level_map = S.outcome.(test).level_map;
-    end
+    data_path = [data_dir, dataset];
+
+    S = load(data_path);
+
+    % run checker on data
+    S = checker(S);
+
+
+    % create a struct to store the results 
+    % results struct will have one struct for each contrast
+    % each contrast struct will have one struct for each combination of pooling
+    % and motion regression
+
+    tests = fieldnames(S.outcome);
+
+    for i = 1:length(tests)
+        % for each outcome...
+        test = tests{i}; % get the name of the outcome/score
+        disp(['running: ', test])
         
-    
-    test_type = infer_test_type(S, test);
-    
-    if strcmp(test_type, 'unknown')
-        error(['could not infer test type for test ', test])
-    end
-            
-    if test_type == 'r'
-        % if study is r, then grab the reference_condition
-        condition = S.outcome.(test).reference_condition;
         
-        % use the reference condition as idx to grab ref brain data
-        m = S.brain_data.(condition).data;
-        
-        % make sure the dims of m are subs x parcels
-        if size(m,2) == length(S.brain_data.(condition).sub_ids)
-            % if the second dimension is subjects,
-            % flip dimensions
-            m = m';
+
+        results = []; % clear the struct from prior loops
+        results.study_info.dataset = S.study_info.dataset;
+        results.study_info.test = S.study_info.test;
+        results.study_info.map = S.study_info.map;
+        if isfield(S.study_info, 'mask') 
+            results.study_info.mask = S.study_info.mask;
+        end % TODO: make sure all input is mask not brain_mask
+        if isfield(S.outcome.(test), 'level_map')
+            results.study_info.level_map = S.outcome.(test).level_map;
         end
-            
-        % get score data
-        score = S.outcome.(test).score;
-        score_label = S.outcome.(test).score_label;
-      
-        % get motion data
-        motion = S.brain_data.(condition).motion;
-        
-        % save contrast to results
-        results.study_info.test_components = {condition, score_label};
-        results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
-        % TODO: remove 'hstest' after testing done
-        
-        % remove missing subject data
-        [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
-       
-    end
-    
-    %TODO: 
-    if test_type == 't'
-        % assuming that for t, contrast is an array of two strings
-        % representing the two conditions in the contrast
-        condition1 = S.outcome.(test).contrast{1};
-        condition2 = S.outcome.(test).contrast{2};
-        m = S.brain_data.(condition1).data;
-        % m is the brain data for the first condition
-        
-        % save contrast to results
-        results.study_info.test_components = {condition1, condition2};
-        
-        % make sure the dims of m are subs x parcels
-        if size(m,2) == length(S.brain_data.(condition).sub_ids)
-            % if the second dimension is subjects,
-            % flip dimensions
-            m = m';
-        end
-        
-        score = S.brain_data.(condition2).data;
-        % score is the brain data for the second condition (could change
-        % naming conventione here, but I was trying to keep things
-        % consistent because after this step it should get treated the same
-        % I think?)
-        motion1 = S.brain_data.(condition1).motion;
-        motion2 = S.brain_data.(condition2).motion;
-        % we have two motion variables here because motion is different for
-        % each run! TODO: decide how to use this...
-        
-        % remove missing subject data
-        [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
-        
-        results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
-    end
-    
-    if strcmp(test_type, 't2')
-        
-        % If contrast is NaN, then the contributor has
-        % combined the data and we will use outcome score as dummy variable
-        contrast = S.outcome.(test).contrast;
-        
-        % Check if contrast has a length of 2, then that means the
-        % contributor has not combined their data so we will combine for
-        % them and create the dummy variable. 
-        if iscell(contrast) && length(contrast) == 2
-            condition1 = S.outcome.(test).contrast{1};
-            condition2 = S.outcome.(test).contrast{2};
-            m1 = S.brain_data.(condition1).data;
-            m2 = S.brain_data.(condition2).data;
-            m = cat(2, m1, m2); %TODO: build in a check for dimensions
-            cond1_ids = S.brain_data.(condition1).sub_ids;
-            cond2_ids = S.brain_data.(condition2).sub_ids;
-            both_cond_ids = cat(1, cond1_ids, cond2_ids);
-            
-            % save contrast to results
-            results.study_info.test_components = {condition1, condition2};
-        
-            
-            % make sure the dims of m are subs x parcels
-            if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
-                % if the second dimension is subjects,
-                % flip dimensions
-                m = m';
-            end
-            
-            % creating the dummy variable as 'score'
-            score = categorical(cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1))); %TODO: test
-            motion1 = S.brain_data.(condition1).motion;
-            motion2 = S.brain_data.(condition2).motion;
-            motion = cat(1, motion1, motion2); 
-            
-            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
 
-        elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
+
+        test_type = infer_test_type(S, test);
+        
+        % TMP: skip the test if the test type is t
+        if strcmp(test_type, "t")
+            disp(['skipping test ', test, ' because test type is t'])
+            continue
+        end
+
+        if strcmp(test_type, 'unknown')
+            error(['could not infer test type for test ', test])
+        end
+
+        if test_type == 'r'
+            % if study is r, then grab the reference_condition
             condition = S.outcome.(test).reference_condition;
+
+            % use the reference condition as idx to grab ref brain data
             m = S.brain_data.(condition).data;
-             
-            score_label = S.outcome.(test).score_label;
-            
-            % save contrast to results
-            results.study_info.test_components = {condition, score_label};
-        
+
             % make sure the dims of m are subs x parcels
             if size(m,2) == length(S.brain_data.(condition).sub_ids)
                 % if the second dimension is subjects,
                 % flip dimensions
                 m = m';
             end
-            
+
+            % get score data
             score = S.outcome.(test).score;
+            score_label = S.outcome.(test).score_label;
+
+            % get motion data
             motion = S.brain_data.(condition).motion;
-            
+
+            % save contrast to results
+            results.study_info.test_components = {condition, score_label};
+            results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', score_label, '_', condition];
+            % TODO: remove 'hstest' after testing done
+
             % remove missing subject data
             [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
-            
-            results_file_prefix = [results_dir, 'hstest_', S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
+
         end
 
-    end
-    
+        %TODO: 
+        if test_type == 't'
+            % TODO: brain mask for t studies
+            % assuming that for t, contrast is an array of two strings
+            % representing the two conditions in the contrast
+            condition1 = S.outcome.(test).contrast{1};
+            condition2 = S.outcome.(test).contrast{2};
+            m = S.brain_data.(condition1).data;
+            % m is the brain data for the first condition
 
-    for do_pooling = pooling_params
+            % save contrast to results
+            results.study_info.test_components = {condition1, condition2};
 
-        %% Do large-scale pooling if specified
-
-        if do_pooling
-
-            m2 = []; 
-            triumask=logical(triu(ones(n_network_groups)));  
-            for i = 1:size(m,1) % over subjects
-                t = structure_data(m(i,:),'triangleside','upper');
-                t2 = summarize_matrix_by_atlas(t,'suppressimg',1)'; % transpose because it does tril by default
-                m2(i,:) = t2(triumask);
+            % make sure the dims of m are subs x parcels
+            if size(m,2) == length(S.brain_data.(condition).sub_ids)
+                % if the second dimension is subjects,
+                % flip dimensions
+                m = m';
             end
 
-            % update results file prefix
-            % results_file_prefix2 = [results_file_prefix,'__by_net'];
-            
-            % set pooling_method for naming
-            pooling_method = 'net';
-        
-        else
-            % results_file_prefix2 = results_file_prefix;
-            m2 = m;
-            
-            % set pooling_method for naming
-            pooling_method = 'none';
+            score = S.brain_data.(condition2).data;
+            % score is the brain data for the second condition (could change
+            % naming conventione here, but I was trying to keep things
+            % consistent because after this step it should get treated the same
+            % I think?)
+            motion1 = S.brain_data.(condition1).motion;
+            motion2 = S.brain_data.(condition2).motion;
+            % we have two motion variables here because motion is different for
+            % each run! TODO: decide how to use this...
+
+            % remove missing subject data
+            [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
+
+            results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
+        end
+
+        if strcmp(test_type, 't2')
+
+            % If contrast is NaN, then the contributor has
+            % combined the data and we will use outcome score as dummy variable
+            contrast = S.outcome.(test).contrast;
+
+            % Check if contrast has a length of 2, then that means the
+            % contributor has not combined their data so we will combine for
+            % them and create the dummy variable. 
+            if iscell(contrast) && length(contrast) == 2
+                condition1 = S.outcome.(test).contrast{1};
+                condition2 = S.outcome.(test).contrast{2};
+                m1 = S.brain_data.(condition1).data;
+                m2 = S.brain_data.(condition2).data;
+                m = cat(2, m1, m2); %TODO: build in a check for dimensions
+                cond1_ids = S.brain_data.(condition1).sub_ids;
+                cond2_ids = S.brain_data.(condition2).sub_ids;
+                both_cond_ids = cat(1, cond1_ids, cond2_ids);
+
+                % save contrast to results
+                results.study_info.test_components = {condition1, condition2};
+
+
+                % make sure the dims of m are subs x parcels
+                if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
+                    % if the second dimension is subjects,
+                    % flip dimensions
+                    m = m';
+                end
+
+                % creating the dummy variable as 'score'
+                score = categorical(cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1))); %TODO: test
+                motion1 = S.brain_data.(condition1).motion;
+                motion2 = S.brain_data.(condition2).motion;
+                motion = cat(1, motion1, motion2); 
+
+                results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition1, '_', condition2];
+
+            elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
+                condition = S.outcome.(test).reference_condition;
+                m = S.brain_data.(condition).data;
+
+                score_label = S.outcome.(test).score_label;
+
+                % save contrast to results
+                results.study_info.test_components = {condition, score_label};
+
+                % make sure the dims of m are subs x parcels
+                if size(m,2) == length(S.brain_data.(condition).sub_ids)
+                    % if the second dimension is subjects,
+                    % flip dimensions
+                    m = m';
+                end
+
+                score = S.outcome.(test).score;
+                motion = S.brain_data.(condition).motion;
+
+                % remove missing subject data
+                [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
+
+                results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', condition, '_', S.outcome.(test).score_label];
+            end
+
         end
 
 
-        for motion_method_it = 1:length(motion_method_params)
+        for do_pooling = pooling_params
 
-            %% Account/correct for motion as specified
-            
-            motion_method = motion_method_params{motion_method_it};
-            disp(['running motion methhod: ', motion_method])
-            % set results name
-            result_name = ['pooling_', pooling_method, '_motion_', motion_method];
-                
-            score2 = score; % changes if applying motion threshold
+            %% Do large-scale pooling if specified
 
-            if ~strcmp(motion_method,'none')
+            if do_pooling
 
-    %            % Align motion and data by subject - REMOVED 051624
-    %            
-    %            % align motion subIDs to data subIDs (removes subjects who do not have data or scoreavior)
-    %            subids_motion = load(motion_subids_file);
-    %            [subids,idx_matrices,idx_motion] = intersect(subids_data,subids_motion,'stable');
-    %            if ~isequal(subids_data,subids_motion(idx_motion)); error('Matrix and motion intersected subject IDs don''t match. Likely subjects with matrices are missing motion.'); end;
-    %            
-    %            % load motion and index based on above alignment
-    %            sub_motion = load(motion_file);
-    %            sub_motion = sub_motion(idx_motion); % get subs with matrices
-    %
-    %            std_sub_motion = std(sub_motion); % TODO: save this or full motion vector
-    %            mean_sub_motion = mean(sub_motion); % TODO: save this or full motion vector
+                m2 = []; 
+                triumask=logical(triu(ones(n_network_groups)));  
+                for i = 1:size(m,1) % over subjects
+                    t = structure_data(m(i,:),'triangleside','upper');
+                    t2 = summarize_matrix_by_atlas(t,'suppressimg',1)'; % transpose because it does tril by default
+                    m2(i,:) = t2(triumask);
+                end
 
-                % threshold if specified
-                if strcmp(motion_method,'threshold')
-                    low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
-                    m2 = m2(low_motion_idx,:);
-                    score2 = score2(low_motion_idx);
-                    std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
-                    mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+                % update results file prefix
+                % results_file_prefix2 = [results_file_prefix,'__by_net'];
+
+                % set pooling_method for naming
+                pooling_method = 'net';
+
+            else
+                % results_file_prefix2 = results_file_prefix;
+                m2 = m;
+
+                % set pooling_method for naming
+                pooling_method = 'none';
+            end
+
+
+            for motion_method_it = 1:length(motion_method_params)
+
+                %% Account/correct for motion as specified
+
+                motion_method = motion_method_params{motion_method_it};
+                disp(['running motion methhod: ', motion_method])
+                % set results name
+                result_name = ['pooling_', pooling_method, '_motion_', motion_method];
+
+                score2 = score; % changes if applying motion threshold
+
+                if ~strcmp(motion_method,'none')
+
+        %            % Align motion and data by subject - REMOVED 051624
+        %            
+        %            % align motion subIDs to data subIDs (removes subjects who do not have data or scoreavior)
+        %            subids_motion = load(motion_subids_file);
+        %            [subids,idx_matrices,idx_motion] = intersect(subids_data,subids_motion,'stable');
+        %            if ~isequal(subids_data,subids_motion(idx_motion)); error('Matrix and motion intersected subject IDs don''t match. Likely subjects with matrices are missing motion.'); end;
+        %            
+        %            % load motion and index based on above alignment
+        %            sub_motion = load(motion_file);
+        %            sub_motion = sub_motion(idx_motion); % get subs with matrices
+        %
+        %            std_sub_motion = std(sub_motion); % TODO: save this or full motion vector
+        %            mean_sub_motion = mean(sub_motion); % TODO: save this or full motion vector
+
+                    % threshold if specified
+                    if strcmp(motion_method,'threshold')
+                        low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
+                        m2 = m2(low_motion_idx,:);
+                        score2 = score2(low_motion_idx);
+                        std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+                        mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+
+                    end
+
+                    % update results file prefix
+                    % results_file_prefix3=[results_file_prefix2,'__with_motion_',motion_method];
 
                 end
-            
-                % update results file prefix
-                % results_file_prefix3=[results_file_prefix2,'__with_motion_',motion_method];
-               
+
+
+                %% Run regression
+
+                if strcmp(motion_method,'regression')
+                    % include motion as a confound
+                    [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2,motion);
+                else
+                    [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2);
+                end
+
+                results.data.(result_name).b_standardized = b_standardized;
+                results.data.(result_name).p = p;
+                results.data.(result_name).n = n;
+                results.data.(result_name).std_brain = std_brain;
+                results.data.(result_name).std_score = std_score;
+
+
             end
-
-
-            %% Run regression
-
-            if strcmp(motion_method,'regression')
-                % include motion as a confound
-                [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2,motion);
-            else
-                [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2);
-            end
-    
-            results.data.(result_name).r = r;
-            results.data.(result_name).p = p;
-            results.data.(result_name).n = n;
-            results.data.(result_name).std_brain = std_brain;
-            results.data.(result_name).std_score = std_score;
-            
-
         end
+        % save this contrast's results file as .mat
+        save([results_file_prefix,'.mat'], 'results');
+
     end
-    % save this contrast's results file as .mat
-    save([results_file_prefix,'.mat'], 'results');
-    
 end
 
 
@@ -412,7 +442,7 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
    
-    n = size(brain,2);
+    n = size(brain,1);
     std_brain = std(brain);
     std_score = std(score);
     
@@ -423,13 +453,13 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     end
    
     % adjust design and which coefficient results to extract based on test type
-    if test_type=='corr'
+    if strcmp(test_type, 'r')
         do_t_test=0;
         test_beta=2;
-    elseif test_type=='t2'
+    elseif strcmp(test_type, 't2')
         do_t_test=1;
         test_beta=2;
-    elseif test_type=='t1'
+    elseif strcmp(test_type, 't')
         do_t_test=1;
         test_beta=1;
         score=[]; % because score is just single group ID, but we already have this in the intercept
