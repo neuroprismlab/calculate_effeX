@@ -60,7 +60,7 @@ filenames = filenames(~[filenames.isdir]);  % Remove directories from the list
 datasets = {filenames.name}; 
 % datasets(1:3) = [];
 %TMP: testing
-datasets= {'s_ukb_fc_jiang.mat'};
+datasets= {'s_hcp_fc_noble_corr.mat'};
 
 % results prefix for testing (will be appended to the start of each result
 % file
@@ -158,9 +158,9 @@ for i = 1:length(datasets)
 
     tests = fieldnames(S.outcome);
 
-    for i = 1:length(tests)
+    for t = 1:length(tests)
         % for each outcome...
-        test = tests{i}; % get the name of the outcome/score
+        test = tests{t}; % get the name of the outcome/score
         disp(['running: ', test])
         
         
@@ -180,10 +180,10 @@ for i = 1:length(datasets)
         test_type = infer_test_type(S, test);
         
         % TMP: skip the test if the test type is t
-        if strcmp(test_type, "t")
-            disp(['skipping test ', test, ' because test type is t'])
-            continue
-        end
+%         if strcmp(test_type, "t")
+%             disp(['skipping test ', test, ' because test type is t'])
+%             continue
+%         end
 
         if strcmp(test_type, 'unknown')
             error(['could not infer test type for test ', test])
@@ -222,40 +222,80 @@ for i = 1:length(datasets)
 
         %TODO: 
         if test_type == 't'
-            % TODO: brain mask for t studies
-            % assuming that for t, contrast is an array of two strings
-            % representing the two conditions in the contrast
-            condition1 = S.outcome.(test).contrast{1};
-            condition2 = S.outcome.(test).contrast{2};
-            m = S.brain_data.(condition1).data;
-            % m is the brain data for the first condition
+            
+            if length(S.outcome.(test).contrast)==1
+                % TODO: brain mask for t studies
+                condition = S.outcome.(test).contrast{1};
+                m = S.brain_data.(condition).data;
+                
+                % TODO: figure out pooling for activation maps
+                % for now, skipping pooling
+                pooling_params = [0];
 
-            % save contrast to results
-            results.study_info.test_components = {condition1, condition2};
+                % save contrast to results
+                results.study_info.test_components = {condition};
 
-            % make sure the dims of m are subs x parcels
-            if size(m,2) == length(S.brain_data.(condition).sub_ids)
-                % if the second dimension is subjects,
-                % flip dimensions
-                m = m';
+                score = ones(1,size(m,2));
+                % score is the brain data for the second condition (could change
+                % naming conventione here, but I was trying to keep things
+                % consistent because after this step it should get treated the same
+                % I think?)
+                motion = S.brain_data.(condition).motion;
+                % we have two motion variables here because motion is different for
+                % each run! TODO: decide how to use this...
+
+                % make sure the dims of m are subs x parcels
+                if size(m,2) == length(S.brain_data.(condition).sub_ids)
+                    % if the second dimension is subjects,
+                    % flip dimensions
+                    m = m';
+                end
+                
+                % remove missing subject data
+                [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
+                
+                score = ones(1,size(m,1));
+
+                results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition];
+
+            else
+                % TODO: brain mask for t studies
+                % assuming that for t, contrast is an array of two strings
+                % representing the two conditions in the contrast
+                condition1 = S.outcome.(test).contrast{1};
+                condition2 = S.outcome.(test).contrast{2};
+                m = S.brain_data.(condition1).data;
+                % m is the brain data for the first condition
+
+                % save contrast to results
+                results.study_info.test_components = {condition1, condition2};
+
+                % make sure the dims of m are subs x parcels
+                if size(m,2) == length(S.brain_data.(condition).sub_ids)
+                    % if the second dimension is subjects,
+                    % flip dimensions
+                    m = m';
+                end
+
+                score = S.brain_data.(condition2).data;
+                % score is the brain data for the second condition (could change
+                % naming conventione here, but I was trying to keep things
+                % consistent because after this step it should get treated the same
+                % I think?)
+                motion1 = S.brain_data.(condition1).motion;
+                motion2 = S.brain_data.(condition2).motion;
+                % we have two motion variables here because motion is different for
+                % each run! TODO: decide how to use this...
+
+                % remove missing subject data
+                [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
+                motion=mean([motion1,motion2],2);
+                    
+                results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
+        
             end
-
-            score = S.brain_data.(condition2).data;
-            % score is the brain data for the second condition (could change
-            % naming conventione here, but I was trying to keep things
-            % consistent because after this step it should get treated the same
-            % I think?)
-            motion1 = S.brain_data.(condition1).motion;
-            motion2 = S.brain_data.(condition2).motion;
-            % we have two motion variables here because motion is different for
-            % each run! TODO: decide how to use this...
-
-            % remove missing subject data
-            [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
-
-            results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', S.study_info.test, '_', condition1, '_', condition2];
         end
-
+        
         if strcmp(test_type, 't2')
 
             % If contrast is NaN, then the contributor has
@@ -330,10 +370,10 @@ for i = 1:length(datasets)
 
                 m2 = []; 
                 triumask=logical(triu(ones(n_network_groups)));  
-                for i = 1:size(m,1) % over subjects
-                    t = structure_data(m(i,:),'triangleside','upper');
-                    t2 = summarize_matrix_by_atlas(t,'suppressimg',1)'; % transpose because it does tril by default
-                    m2(i,:) = t2(triumask);
+                for s = 1:size(m,1) % over subjects
+                    tr = structure_data(m(s,:),'triangleside','upper');
+                    t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
+                    m2(s,:) = t2(triumask);
                 end
 
                 % update results file prefix
@@ -471,15 +511,32 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     if do_t_test
         
         % design matrix representing group ID or intercept is predictor - standard design for t-test 
-        for i=1:size(brain,2)
-            mdl(:,:,i) = Regression_fast([ones(n,1),score,confounds], brain(:,i), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+        for c=1:size(brain,2)
+            has_brain_data=~isnan(brain(:,c));
+            n_has_brain_data = sum(has_brain_data);
+%             if ~isempty(score)
+%                 score2=score(has_brain_data);
+%                 mdl(:,:,c) = Regression_fast([ones(1,n),score2,confounds], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+%             else
+            %score2 = score;
+            if ~isempty(confounds)
+                confounds2 = confounds(has_brain_data);
+            else
+                confounds2 = confounds;
+            end
+            mdl(:,:,c) = Regression_fast([ones(1,n_has_brain_data)', confounds2'], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            %end
         end
     
     else
 
         % score is outcome - standard design for correlation
-        for i=1:size(brain,2)
-            mdl(:,:,i) = Regression_fast([ones(n,1),brain(:,i),confounds], score, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+        for c=1:size(brain,2)
+            has_brain_data=~isnan(brain(:,c));
+            if ~isempty(score)
+                score2=score(has_brain_data);
+            end
+            mdl(:,:,c) = Regression_fast([ones(n,1),brain(has_brain_data,c),confounds], score2, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
             % same results without covariate: [r, p] = corr(brain,score);
         end
    
