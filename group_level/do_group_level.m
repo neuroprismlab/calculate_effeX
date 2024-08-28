@@ -158,7 +158,7 @@ for i = 1:length(datasets)
 
     tests = fieldnames(S.outcome);
 
-    for t = 2:length(tests)
+    for t = 1:length(tests)
         % for each outcome...
         test = tests{t}; % get the name of the outcome/score
         disp(['running: ', test])
