@@ -35,7 +35,33 @@ function S = checker(S)
             S.brain_data.(cond).motion = table2array(S.brain_data.(cond).motion);
             disp(['   > converted cond "', cond,'"'])
         end
-        %disp(['class of ', cond, ' is ', class(S.brain_data.(cond).motion)])
+        
+        % check dimnsions of brain data
+        if size(S.brain_data.(cond).data,1) ~= length(S.brain_data.(cond).sub_ids)
+            S.brain_data.(cond).data = S.brain_data.(cond).data';
+        end
+        
+        % check dimensions of motion
+        % want n_subs x 1
+        if size(S.brain_data.(cond).motion, 1) == 1
+            S.brain_data.(cond).motion = S.brain_data.(cond).motion';
+        end
+        
+        % check dimensions of sub_ids
+        % want n_subs x 1
+        if size(S.brain_data.(cond).sub_ids, 1) == 1
+            S.brain_data.(cond).sub_ids = S.brain_data.(cond).sub_ids';
+        end
+        
+        % check dimensions of sub_ids_motion
+        % want n_subs x 1
+        if isfield(S.brain_data.(cond), 'sub_ids_motion')
+            if size(S.brain_data.(cond).sub_ids_motion, 1) == 1
+                S.brain_data.(cond).sub_ids_motion = S.brain_data.(cond).sub_ids_motion';
+            end
+        end
+        
+            
     end
 
 
@@ -58,7 +84,7 @@ function S = checker(S)
             % remove empty cells from score
             S.outcome.(test).score(to_be_removed) = [];
             % remove also from subject ID list
-            S.outcome.(test).sub_ids(to_be_removed = [];
+            S.outcome.(test).sub_ids(to_be_removed) = [];
             disp(['     removed ', num2str(sum(emptyCells)), ' empty cells & ',num2str(sum(emptyCells)),' NaN cells'])
             % TODO: should check whether there are nans (any case) as string
 
@@ -100,8 +126,8 @@ function S = checker(S)
 
             elseif length(unique(S.outcome.(test).score)) > 2
                 
-                error(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
-                %S.outcome = rmfield(S.outcome,test);
+                warning(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
+                S.outcome = rmfield(S.outcome,test);
             end
 
         elseif isa(S.outcome.(test).score, 'categorical')
@@ -133,8 +159,8 @@ function S = checker(S)
                 S.outcome.(test).level_map = level_map;
 
             elseif length(unique(S.outcome.(test).score)) > 2
-                error(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
-                %S.outcome = rmfield(S.outcome,test);
+                warning(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
+                S.outcome = rmfield(S.outcome,test);
             end
 
 
@@ -147,7 +173,14 @@ function S = checker(S)
             disp(['     removed ', num2str(sum(nan_idx)), ' empty cells'])
 
         end  
-
+        
+        % check dimensions of score
+        % want n_subs x 1
+        if isfield(S.outcome, test)
+            if size(S.outcome.(test).score,1) == 1
+                S.outcome.(test).score = S.outcome.(test).score';
+            end
+        end
     end
     
 end

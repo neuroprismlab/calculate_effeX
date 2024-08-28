@@ -104,11 +104,10 @@ addpath(regression_fast_script_path);
 
 
 % testing stuff
-testing=1
+testing=0
 if testing
-    % datasets(1:3) = []; % TODO: TESTING - remove when complete
-    datasets= {'s_hcp_fc_noble_corr.mat'}; % TODO: TESTING - remove when complete
-    res_prefix = 'testing'; % appended to the start of each result file
+    datasets= {'s_ukb_fc_jiang.mat'}; % TODO: TESTING - remove when complete
+    res_prefix = 'hs_'; % appended to the start of each result file
     
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
@@ -116,6 +115,8 @@ if testing
     if contains(datasets, "ukb") ||  contains(datasets, "act")
         pooling_params = [0];
     end
+    
+    test_test = {'test2'};
 
 end
 
@@ -139,6 +140,12 @@ for i = 1:length(datasets)
     % get results for each test
 
     tests = fieldnames(S.outcome);
+    
+    % TMP: for testing one specific test
+    if testing
+        tests = test_test;
+    end
+    
     for t = 1:length(tests)
         
         test = tests{t}; 
@@ -233,25 +240,19 @@ for i = 1:length(datasets)
                 motion2 = S.brain_data.(condition2).motion;
                 score = [];  % score is set below for paired one-sample t test; setting placeholder here 
                 score_label = S.outcome.(test).score_label;
-
-                    
+                
+                % remove missing subject data
+                % TODO: this will have to be updated for m (from m2-m1) and motion (from mean([motion1,motion2],2), checking subids
+                [m1, m2, motion1, motion2] = remove_missing_subs(m1, m2, S, test_type, test, condition1, condition2, motion1, motion2);
+                        
+                % to facilitate paired test: take mean motion for a single confound covariate
+                % TODO: check m1 and m2 are both ordered by the same subids before the following diff
+                motion=mean([motion1,motion2],2);
+                
                 % to facilitate paired test: take CONDITION *2* - CONDITION *1* difference
                 % TODO: check m1 and m2 are both ordered by the same subids before the following diff
                 m = m2-m1;
                 
-                % to facilitate paired test: take mean motion for a single confound covariate
-                % TODO: check m1 and m2 are both ordered by the same subids before the following diff
-                motion=mean([motion1,motion2],2);
- 
-                % check brain dims are n_subs x n_parcels, otherwise flip % TODO: dim checking should be added to checker, and then we just flip here
-                if size(m,2) == length(S.brain_data.(condition).sub_ids)
-                    m = m';
-                end
-                
-                % remove missing subject data
-                % TODO: this will have to be updated for m (from m2-m1) and motion (from mean([motion1,motion2],2), checking subids
-                [m, score, motion1, motion2] = remove_missing_subs(m, score, S, test_type, test, condition1, condition2, motion1, motion2);
-                         
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
         
@@ -392,7 +393,9 @@ for i = 1:length(datasets)
                     if strcmp(motion_method,'threshold')
                         low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
                         m2 = m2(low_motion_idx,:);
-                        score2 = score2(low_motion_idx);
+                        if ~isempty(score2)
+                            score2 = score2(low_motion_idx);
+                        end
                         std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
                         mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
                         % TODO: consider saving number of subjects who are above motion threshold
@@ -506,6 +509,7 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     else
 
         % score is outcome - standard design for correlation
+        % preallocate mdl
         for c=1:size(brain,2)
             has_brain_data=~isnan(brain(:,c));
             if ~isempty(score)

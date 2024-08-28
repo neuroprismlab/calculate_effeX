@@ -106,6 +106,8 @@ function [m, score, varargout] = remove_missing_subs(m, score, S, test_type, tes
             motion2 = motion2(motion2_idx);
             varargout{1} = motion1;
             varargout{2} = motion2;
+            
+           
         end
         
         
