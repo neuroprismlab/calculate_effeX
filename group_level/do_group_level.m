@@ -158,7 +158,7 @@ for i = 1:length(datasets)
 
     tests = fieldnames(S.outcome);
 
-    for t = 1:length(tests)
+    for t = 2:length(tests)
         % for each outcome...
         test = tests{t}; % get the name of the outcome/score
         disp(['running: ', test])
@@ -367,6 +367,8 @@ for i = 1:length(datasets)
             %% Do large-scale pooling if specified
 
             if do_pooling
+                
+                disp('with pooling')
 
                 m2 = []; 
                 triumask=logical(triu(ones(n_network_groups)));  
@@ -396,7 +398,7 @@ for i = 1:length(datasets)
                 %% Account/correct for motion as specified
 
                 motion_method = motion_method_params{motion_method_it};
-                disp(['running motion methhod: ', motion_method])
+                disp(['running motion method: ', motion_method])
                 % set results name
                 result_name = ['pooling_', pooling_method, '_motion_', motion_method];
 
@@ -514,17 +516,18 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
         for c=1:size(brain,2)
             has_brain_data=~isnan(brain(:,c));
             n_has_brain_data = sum(has_brain_data);
-%             if ~isempty(score)
-%                 score2=score(has_brain_data);
+             if ~isempty(score)
+                 score2=score(has_brain_data);
 %                 mdl(:,:,c) = Regression_fast([ones(1,n),score2,confounds], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
-%             else
-            %score2 = score;
+            else
+                score2 = score;
+            end
             if ~isempty(confounds)
                 confounds2 = confounds(has_brain_data);
             else
                 confounds2 = confounds;
             end
-            mdl(:,:,c) = Regression_fast([ones(1,n_has_brain_data)', confounds2'], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            mdl(:,:,c) = Regression_fast([ones(n_has_brain_data,1), score2, confounds2], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
             %end
         end
     
