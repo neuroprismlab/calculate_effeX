@@ -141,7 +141,7 @@ addpath(regression_fast_script_path);
 for i = 1:length(datasets)
    
     dataset = datasets{i};
-    disp(['running dataset: ',dataset])
+    fprintf(['Processing dataset: ',dataset,'\n'])
     
     data_path = [data_dir, dataset];
 
@@ -159,11 +159,12 @@ for i = 1:length(datasets)
     tests = fieldnames(S.outcome);
 
     for t = 1:length(tests)
+        
         % for each outcome...
         test = tests{t}; % get the name of the outcome/score
-        disp(['running: ', test])
+        disp(['Running test "', test,'"'])
         
-        
+        % Setup
 
         results = []; % clear the struct from prior loops
         results.study_info.dataset = S.study_info.dataset;
@@ -367,9 +368,6 @@ for i = 1:length(datasets)
             %% Do large-scale pooling if specified
 
             if do_pooling
-                
-                disp('with pooling')
-
                 m2 = []; 
                 triumask=logical(triu(ones(n_network_groups)));  
                 for s = 1:size(m,1) % over subjects
@@ -392,13 +390,15 @@ for i = 1:length(datasets)
                 pooling_method = 'none';
             end
 
+            disp(['   > pooling = ', pooling_method])
+
 
             for motion_method_it = 1:length(motion_method_params)
 
                 %% Account/correct for motion as specified
 
                 motion_method = motion_method_params{motion_method_it};
-                disp(['running motion method: ', motion_method])
+                disp(['     > motion method = ', motion_method])
                 % set results name
                 result_name = ['pooling_', pooling_method, '_motion_', motion_method];
 
