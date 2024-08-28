@@ -24,10 +24,11 @@
 
 function S = checker(S)
 
-    % check that motion is an array
-    conditions = fieldnames(S.brain_data);
-
+    % Check motion format
+    
     disp('Convert motion to array if needed.')
+    
+    conditions = fieldnames(S.brain_data);
     for i = 1:length(conditions)
         cond = conditions{i};
         if istable(S.brain_data.(cond).motion)
@@ -35,14 +36,14 @@ function S = checker(S)
             disp(['   > converted cond "', cond,'"'])
         end
         %disp(['class of ', cond, ' is ', class(S.brain_data.(cond).motion)])
-
     end
 
 
-    % discard tests that don't work for r, t, or t2
-    tests = fieldnames(S.outcome);
-
+    % Discard tests that don't work for r, t, or t2
+    
     disp('Checking tests')
+    
+    tests = fieldnames(S.outcome);
     for i = 1:length(tests)
         test = tests{i};
         disp(['   > test "', test,'" (class ', class(S.outcome.(test).score),')'])
@@ -52,19 +53,14 @@ function S = checker(S)
 
             % remove empty and NaN cells
             emptyCells = cellfun(@isempty, S.outcome.(test).score);
+            nanCells = cellfun(@(x) any(isnan(x)), S.outcome.(test).score); % TODO: check
+            to_be_removed=[emptyCells,nanCells];
             % remove empty cells from score
-            S.outcome.(test).score(emptyCells) = [];
+            S.outcome.(test).score(to_be_removed) = [];
             % remove also from subject ID list
-            S.outcome.(test).sub_ids(emptyCells) = [];
-            disp(['     removed ', num2str(sum(emptyCells)), ' empty cells'])
-
-            % remove NaN cells
-            nanCells = cellfun(@(x) any(isnan(x)), S.outcome.(test).score);
-            % remove from score
-            S.outcome.(test).score(nanCells) = [];
-            % remove from sub id list
-            S.outcome.(test).sub_ids(nanCells) = [];
-            disp(['     removed ', num2str(sum(emptyCells)), ' NaN cells'])
+            S.outcome.(test).sub_ids(to_be_removed = [];
+            disp(['     removed ', num2str(sum(emptyCells)), ' empty cells & ',num2str(sum(emptyCells)),' NaN cells'])
+            % TODO: should check whether there are nans (any case) as string
 
             % if cell array contains numbers, convert to numeric array
             if all(cellfun(@isnumeric, S.outcome.(test).score))
@@ -77,7 +73,7 @@ function S = checker(S)
                 % accounted for currently. Have not seen in the data though.
 
             % if there are only two unique values, change to zeros and ones
-            elseif length(unique(S.outcome.(test).score)) == 2
+            elseif length(unique(rmmissing(S.outcome.(test).score))) == 2
                 keys = [0, 1];
                 values = unique(rmmissing(S.outcome.(test).score));
 
@@ -87,8 +83,12 @@ function S = checker(S)
                     key_name = ['key_', num2str(key)];
                     level_map.(key_name).key = key;
                     level_map.(key_name).value = values(idx);
-                    S.outcome.(test).score(cellfun(@(x) strcmp(x, values{idx}), S.outcome.(test).score)) = {key};
+                    
+                    S.outcome.(test).score(cellfun(@(x) strcmp(x, values{idx}), S.outcome.(test).score)) = {key}; % TODO: why assign a cell?
                 end
+                % TODO: instead of the above and assignment below, consider instead:
+                %S.outcome.(test).level_map=table(keys, values);
+
                 disp(['     ', test, ' has two levels. Converted to binary.'])
 
                 % transform from cell array to matrix
@@ -99,19 +99,22 @@ function S = checker(S)
                 S.outcome.(test).level_map = level_map;
 
             elseif length(unique(S.outcome.(test).score)) > 2
-                disp(['     ',test, ' has more than 2 unique levels (and not numeric). Removing it'])
-                S.outcome = rmfield(S.outcome,test);
+                
+                error(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
+                %S.outcome = rmfield(S.outcome,test);
             end
 
         elseif isa(S.outcome.(test).score, 'categorical')
-            nan_idx = isundefined(S.outcome.(test).score);
-            S.outcome.(test).score = S.outcome.(test).score(~nan_idx);
-            S.outcome.(test).sub_ids = S.outcome.(test).sub_ids(~nan_idx);
+            % TODO: much of this can probably be combined with the above
+            undefined_idx = isundefined(S.outcome.(test).score);
+            S.outcome.(test).score = S.outcome.(test).score(~undefined_idx);
+            S.outcome.(test).sub_ids = S.outcome.(test).sub_ids(~undefined_idx);
 
-            disp(['     removed ', num2str(sum(nan_idx)), ' empty cells'])
+            disp(['     removed ', num2str(sum(undefined_idx)), ' undefined cells'])
 
             % change categorical to binary 0s and 1s
-            if length(unique(S.outcome.(test).score)) == 2
+            if length(rmmissing(unique(S.outcome.(test).score))) == 2
+                % TODO: should check whether there are nans (any case) as string
 
                 keys = [0, 1];
                 values = unique(S.outcome.(test).score);
@@ -130,8 +133,8 @@ function S = checker(S)
                 S.outcome.(test).level_map = level_map;
 
             elseif length(unique(S.outcome.(test).score)) > 2
-                disp(['     ',test, ' has more than 2 unique levels (and not numeric). Removing it'])
-                S.outcome = rmfield(S.outcome,test);
+                error(['Test ',test, ' has more than 2 unique levels and is not numeric. No functionality currently exists to run tests accordingly.'])
+                %S.outcome = rmfield(S.outcome,test);
             end
 
 
