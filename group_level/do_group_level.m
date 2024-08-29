@@ -107,7 +107,7 @@ addpath(regression_fast_script_path);
 testing=0;
 if testing
     datasets= {'s_pnc_fc_ye.mat'}; % TODO: TESTING - remove when complete
-    res_prefix = 'hs_'; % appended to the start of each result file
+    res_prefix = 'aug29_'; % appended to the start of each result file
     
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
@@ -119,12 +119,9 @@ if testing
     test_test = {'test3'};
 
 else
-    % TODO: TMP: start at s_hcp_act_noble_1
-    datasets = datasets(6:7);
     % TODO: for now we still want to not pool ukb and act even when not
     % testing
-    res_prefix = 'aug29_';
-    
+    res_prefix = date;
 end
 
 %% Calculate effects for each test of each dataset
