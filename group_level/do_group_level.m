@@ -104,9 +104,9 @@ addpath(regression_fast_script_path);
 
 
 % testing stuff
-testing=0
+testing=0;
 if testing
-    datasets= {'s_ukb_fc_jiang.mat'}; % TODO: TESTING - remove when complete
+    datasets= {'s_pnc_fc_ye.mat'}; % TODO: TESTING - remove when complete
     res_prefix = 'hs_'; % appended to the start of each result file
     
     % if ukb data, pooling_params = [0] because we don't have a map
@@ -116,11 +116,16 @@ if testing
         pooling_params = [0];
     end
     
-    test_test = {'test2'};
+    test_test = {'test3'};
 
+else
+    % TODO: TMP: start at s_hcp_act_noble_1
+    datasets = datasets(6:7);
+    % TODO: for now we still want to not pool ukb and act even when not
+    % testing
+    res_prefix = 'aug29_';
+    
 end
-
-
 
 %% Calculate effects for each test of each dataset
 
@@ -131,6 +136,11 @@ for i = 1:length(datasets)
    
     dataset = datasets{i};
     fprintf(['Processing dataset: ',dataset,'\n'])
+    
+    %TODO: TMP: remove this once we get ukb map and figure out act pooling
+    if contains(dataset, "ukb") ||  contains(dataset, "act")
+        pooling_params = [0];
+    end
     
     % load & check data
     data_path = [data_dir, dataset];
@@ -487,6 +497,7 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
 
     if do_t_test
         
+        
         % design matrix representing group ID or intercept is predictor - standard design for t-test 
         for c=1:size(brain,2)
             has_brain_data=~isnan(brain(:,c));
@@ -509,13 +520,22 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     else
 
         % score is outcome - standard design for correlation
-        % preallocate mdl
+        
         for c=1:size(brain,2)
             has_brain_data=~isnan(brain(:,c));
+            n_has_brain_data = sum(has_brain_data);
             if ~isempty(score)
                 score2=score(has_brain_data);
+            else
+                score2 = score;
             end
-            mdl(:,:,c) = Regression_fast([ones(n,1),brain(has_brain_data,c),confounds], score2, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+            if ~isempty(confounds)
+                confounds2 = confounds(has_brain_data);
+            else
+                confounds2 = confounds;
+            end
+            
+            mdl(:,:,c) = Regression_fast([ones(n_has_brain_data,1),brain(has_brain_data,c),confounds2], score2, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
             % same results without covariate: [r, p] = corr(brain,score);
         end
    
