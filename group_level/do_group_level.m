@@ -104,19 +104,20 @@ addpath(regression_fast_script_path);
 
 
 % testing stuff
-testing=0;
+testing=1;
 if testing
-    datasets= {'s_pnc_fc_ye.mat'}; % TODO: TESTING - remove when complete
-    res_prefix = 'aug29_'; % appended to the start of each result file
+    % run first test of every dataset
+    
+    %datasets= {'s_pnc_fc_ye.mat'}; % TODO: TESTING - remove when complete
+    res_prefix = date; % appended to the start of each result file
     
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
     % TODO: TMP: change this once we have a ukb map
-    if contains(datasets, "ukb") ||  contains(datasets, "act")
-        pooling_params = [0];
-    end
+%     if contains(datasets, "ukb") ||  contains(datasets, "act")
+%         pooling_params = [0];
+%     end
     
-    test_test = {'test3'};
 
 else
     % TODO: for now we still want to not pool ukb and act even when not
@@ -150,7 +151,7 @@ for i = 1:length(datasets)
     
     % TMP: for testing one specific test
     if testing
-        tests = test_test;
+        tests = tests(1);
     end
     
     for t = 1:length(tests)
@@ -166,7 +167,9 @@ for i = 1:length(datasets)
         results.study_info.map = S.study_info.map;
         if isfield(S.study_info, 'mask')
             results.study_info.mask = S.study_info.mask;
-        end % TODO: make sure all input is mask not brain_mask
+        elseif isfield(S.study_info, 'brain_mask')% TODO: make sure all input is mask not brain_mask
+            results.study_info.mask = S.study_info.brain_mask;
+        end %TODO: move to checker (to change brain_mask to mask)
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
@@ -432,8 +435,19 @@ for i = 1:length(datasets)
                 results.data.(result_name).n = n;
                 results.data.(result_name).std_brain = std_brain;
                 results.data.(result_name).std_score = std_score;
+                results.data.(result_name).pooling_method = pooling_method;
+                results.data.(result_name).motion_method = motion_method;
+                
+                
 
             end
+        end
+        
+        % if category provided for the test, save
+        if isfield(S.outcome.(test), 'category')
+            results.study_info.category = S.outcome.(test).category;
+        else
+            results.study_info.category = NaN;
         end
 
         % Save all results for this test
