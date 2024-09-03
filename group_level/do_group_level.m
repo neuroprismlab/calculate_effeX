@@ -109,26 +109,24 @@ if testing
     % run first test of every dataset
     
     datasets= {'s_hcp_fc_noble_corr.mat'};
-    res_prefix = date; % appended to the start of each result file
-    
+
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
     % TODO: TMP: change this once we have a ukb map
 %     if contains(datasets, "ukb") ||  contains(datasets, "act")
 %         pooling_params = [0];
 %     end
-    
-
-else
     % TODO: for now we still want to not pool ukb and act even when not
     % testing
-    res_prefix = date;
+%this_score='age'; % TODO: remove when done testing
+
 end
+res_prefix = date; % appended to the start of each result file
+
 
 %% Calculate effects for each test of each dataset
 
 % TODO: loop through outcomes, and get data according to each test / outcome name
-%this_score='age'; % TODO: remove when done testing
 
 for i = 1:length(datasets)
    
