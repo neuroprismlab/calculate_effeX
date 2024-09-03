@@ -108,7 +108,7 @@ testing=1;
 if testing
     % run first test of every dataset
     
-    %datasets= {'s_pnc_fc_ye.mat'}; % TODO: TESTING - remove when complete
+    datasets= {'s_hcp_fc_noble_corr.mat'};
     res_prefix = date; % appended to the start of each result file
     
     % if ukb data, pooling_params = [0] because we don't have a map
@@ -493,74 +493,52 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     end
    
     % adjust design and which coefficient results to extract based on test type
-    if strcmp(test_type, 'r')
-        do_t_test=0;
-        test_beta=2;
-    elseif strcmp(test_type, 't2')
+    % TODO: clean up. There's a little more logic here than I think is needed
+    if strcmp(test_type, 't2')
         do_t_test=1;
-        test_beta=2;
     elseif strcmp(test_type, 't')
         do_t_test=1;
-        test_beta=1;
         score=[]; % because score is just single group ID, but we already have this in the intercept
         std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result
+    else
+        do_t_test=0;
     end
         
     % Run regression across each brain variable
 
     if do_t_test
-        
-        
         % design matrix representing group ID or intercept is predictor - standard design for t-test 
-        for c=1:size(brain,2)
-            has_brain_data=~isnan(brain(:,c));
-            n_has_brain_data = sum(has_brain_data);
-             if ~isempty(score)
-                 score2=score(has_brain_data);
-%                 mdl(:,:,c) = Regression_fast([ones(1,n),score2,confounds], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
+        
+       if strcmp(test_type, 't') % can't use corr, need intercept
+
+            mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
+            
+            b_standardized = mdl(:,1,1);
+            p = mdl(:,1,2);
+
+        else %t2
+            if isempty(confounds)
+                [b_standardized,p]=corr(brain,score);
             else
-                score2 = score;
+                [b_standardized,p]=partialcorr(brain,score,confounds);
             end
-            if ~isempty(confounds)
-                confounds2 = confounds(has_brain_data);
-            else
-                confounds2 = confounds;
-            end
-            mdl(:,:,c) = Regression_fast([ones(n_has_brain_data,1), score2, confounds2], brain(has_brain_data,c), 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
-            %end
+     
+            % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
+            % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise 
         end
     
     else
 
         % score is outcome - standard design for correlation
-        
-        for c=1:size(brain,2)
-            has_brain_data=~isnan(brain(:,c));
-            n_has_brain_data = sum(has_brain_data);
-            if ~isempty(score)
-                score2=score(has_brain_data);
-            else
-                score2 = score;
-            end
-            if ~isempty(confounds)
-                confounds2 = confounds(has_brain_data);
-            else
-                confounds2 = confounds;
-            end
-            
-            mdl(:,:,c) = Regression_fast([ones(n_has_brain_data,1),brain(has_brain_data,c),confounds2], score2, 1); % note: fitlm is built-in for this but too slow % TODO: check p-value calculation - some set to 0,  maybe singular for edge-wise
-            % same results without covariate: [r, p] = corr(brain,score);
+
+        if isempty(confounds)
+            [b_standardized,p]=corr(score,brain);
+        else
+            [b_standardized,p]=partialcorr(score,brain,confounds);
         end
    
     end
-    
-    b = squeeze(mdl(test_beta,1,:))'; % unstandardized betas
-    p = squeeze(mdl(test_beta,2,:))';
-    if do_t_test
-        b_standardized = b .* std_score ./ std_brain; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
-    else
-        b_standardized = b .* std_brain ./ std_score; % standardized betas - https://www3.nd.edu/~rwilliam/stats1/x92.pdf - TODO: this is not technically a "partial r" - decide what to do for subsequent R^2 or Cohen's d
-    end
-            
+
 end
+            
 
