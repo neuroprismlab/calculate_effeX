@@ -3,10 +3,6 @@
 
 library(R.matlab)
 
-# Load the .mat file
-path <- '/work/neuroprism/effect_size/data/group_level/29-Aug-2024abcd_fc_t2_rest_sex.mat'
-mat_data <- readMat(path)
-
 # Define a function to automatically assign names to the sublists
 assign_names <- function(mat_list) {
   # Extract the top-level names
@@ -43,10 +39,4 @@ assign_names <- function(mat_list) {
   
   return(mat_list)
 }
-
-# Apply the function to your loaded data
-results_named <- assign_names(mat_data)
-
-# Inspect the results
-str(results_named)
 

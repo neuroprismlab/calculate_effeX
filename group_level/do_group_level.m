@@ -138,6 +138,8 @@ for i = 1:length(datasets)
     %TODO: TMP: remove this once we get ukb map and figure out act pooling
     if contains(dataset, "ukb") ||  contains(dataset, "act")
         pooling_params = [0];
+    else
+        pooling_params = [0,1];
     end
     
     % load & check data
