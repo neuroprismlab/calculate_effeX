@@ -56,10 +56,17 @@
 #       - orig_stat_type
 #       - test_component_1
 #       - test_component_2
+#       - category
+# 
+#   - brain_masks
+#       - <name>
+#           - mask
+#       - <name>
+#           ...
 
 clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level/',
                        script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl',
-                       output_file = paste0('/work/neuroprism/effect_size/data/combined_gl/output/combined_maps_', Sys.Date(), '.RData'),
+                       output_file = paste0('/work/neuroprism/effect_size/data/combined_gl/intermediates/cleaned_data_', Sys.Date(), '.RData'),
                        testing = FALSE) {
   
   source(file.path(script_dir, 'helpers.R'))
@@ -80,12 +87,16 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level
   
   # create empty dataframe for study info
   column_names <- c("basefile", "folder", "name", "ext", "dataset", "map_type",
-                    "orig_stat_type", "test_component_1", "test_component_2") 
+                    "orig_stat_type", "test_component_1", "test_component_2", 
+                    "category") 
   # TODO: add level_map
   study <- setNames(data.frame(matrix(ncol = length(column_names), nrow = 0)), column_names)
   
   # create empty list for stat_maps (list of lists)
   stat_maps <- list()
+  
+  # create empty list for brain masks
+  brain_masks <- list()
   
   # loop through all file names
   for (file in mat_file_names) {
@@ -113,7 +124,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level
                           dataset = study_info$dataset, map_type = study_info$map,
                           orig_stat_type = study_info$test,
                           test_component_1 = study_info$test.components[[1]][[1]],
-                          test_component_2 = test_component_2
+                          test_component_2 = test_component_2,
+                          category = study_info$category
     )
     
     # add to study dataframe
@@ -126,10 +138,10 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level
     
     stat_maps[[name]] <- data$results$data
     
-    # add brain mask to stat_maps as well
-    stat_maps[[name]]$brain_mask <- data$results$study.info$mask
+    # add brain mask to brain_masks
+    brain_masks[[name]]$mask <- data$results$study.info$mask
     
   }
-  save(study, stat_maps, file = output_file)
-  return(list(study = study, data = stat_maps))
+  save(study, stat_maps, brain_masks, file = output_file)
+  return(list(study = study, data = stat_maps, brain_masks = brain_masks))
 }
