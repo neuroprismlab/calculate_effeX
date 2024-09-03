@@ -56,6 +56,7 @@
 #       - orig_stat_type
 #       - test_component_1
 #       - test_component_2
+#       - category
 
 clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level/',
                        script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl',
@@ -80,7 +81,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level
   
   # create empty dataframe for study info
   column_names <- c("basefile", "folder", "name", "ext", "dataset", "map_type",
-                    "orig_stat_type", "test_component_1", "test_component_2") 
+                    "orig_stat_type", "test_component_1", "test_component_2", 
+                    "category") 
   # TODO: add level_map
   study <- setNames(data.frame(matrix(ncol = length(column_names), nrow = 0)), column_names)
   
@@ -113,7 +115,8 @@ clean_data <- function(data_dir = '/work/neuroprism/effect_size/data/group_level
                           dataset = study_info$dataset, map_type = study_info$map,
                           orig_stat_type = study_info$test,
                           test_component_1 = study_info$test.components[[1]][[1]],
-                          test_component_2 = test_component_2
+                          test_component_2 = test_component_2,
+                          category = study_info$category
     )
     
     # add to study dataframe
