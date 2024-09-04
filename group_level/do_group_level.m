@@ -108,7 +108,7 @@ testing=1;
 if testing
     % run first test of every dataset
     
-    datasets= {'s_hcp_fc_noble_corr.mat'};
+    % datasets= {'s_hcp_fc_noble_corr.mat'};
 
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
@@ -150,8 +150,8 @@ for i = 1:length(datasets)
     tests = fieldnames(S.outcome);
     
     % TMP: for testing one specific test
-    if testing
-        tests = tests(1);
+    if testing && dataset == "s_pnc_fc_ye.mat"
+        tests = tests(1:10);
     end
     
     for t = 1:length(tests)
@@ -305,12 +305,20 @@ for i = 1:length(datasets)
                 % TODO: should also run remove_missing_subs to compare m vs motion here
 
                 % creating the dummy variable as 'score'
-                score = categorical(cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1))); %TODO: test
+                score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1)); %TODO: test
                 % TODO: consider the simpler:
                 % score = [zeros(size(m1,2)); ones(size(m2,2))];
 
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
+                
+%                 % calculate n1 and n2
+%                 n1 = sum(S.outcome.(test).score==1);
+%                 n2 = sum(S.outcome.(test).score==0);
+%                 
+%                 % save n1 and n2
+%                 results.study_info.n1 = n1;
+%                 results.study_info.n2 = n2;
 
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
                 
@@ -333,6 +341,14 @@ for i = 1:length(datasets)
 
                 % get test components and add to results
                 results.study_info.test_components = {condition, score_label};
+                
+%                 % calculate n1 and n2
+%                 n1 = sum(S.outcome.(test).score==1);
+%                 n2 = sum(S.outcome.(test).score==0);
+%                 
+%                 % save n1 and n2
+%                 results.study_info.n1 = n1;
+%                 results.study_info.n2 = n2;
 
             end
         end

@@ -1,47 +1,94 @@
-##############################################
+# Master script
+
+# step 1: clean and combine data
+# step 2: QC
+# step 3: calculate effect size
+# step 4: calculate sim CIs
+
+# Input:
+#   file names: (date)_(dataset)_(map_type)_(test_type)_(condition)_(outcome).mat
+#   - study_info
+#       - dataset
+#       - <test_components> (e.g., {'condition_label', 'score_label'}
+#       - map
+#       - test
+#       - level_map (optional)
+#       - brain_mask
+#       - category
+#   - data
+#       - <pooling strategy>
+#            - <motion strategy>
+#                 - b_standardized
+#                 - p
+#                 - std_brain
+#                 - std_score
+#                 - n         ------------ NaN if two-sample
+#                 - n1        ------------ NaN if one-sample
+#                 - n2        ------------ NaN if one-sample
+#                 - pooling_method (e.g., 'net')
+#                 - motion_method (e.g., 'regression')
 #
-# Summarize effect maps
+# Output: 
+#   file_name: combined_data_(date).RData
 #
-# Prerequisites:
-#   1. Calculate group effect maps
-#       - Instructions for estimating effect maps: https://docs.google.com/document/d/1Sj2nC_4VocOEzOOEx6GokruxYy4Zp1vwsG72gBUSQf0/edit#
-#   2. Transfer group effect maps to Discovery
-#       - run: transfer_orig_maps.sh
-#       - moves data from MRRC -> Discovery
-#         (i.e., MRRC /data_dustin/store3/training/effect_size/ -> Discovery /work/neuroprism/effect_size/)
+#   - data
+#       - <name>
+#           - <pooling>_<motion>
+#		        			 - b_standardized
+#                  - p
+#                  - std_brain 
+#                  - std_score 
+#                  - n         ------------ NaN if two-sample
+#                  - n1        ------------ NaN if one-sample
+#                  - n2        ------------ NaN if one-sample
+#                  - pooling_method (e.g., 'net')
+#                  - motion_method (e.g., 'regression')
+#                  - d
+#                  - ci_lb
+#                  - ci_ub
+#           - <pooling>_<motion>
+#                 ...
+#		    - <name>
+#			      - ...
 #
-# Input: Data naming conventions - separate studies:
-#   - File names:
-#       (dataset)_(act|fc)_(t|t2|r)_(var/group1)_(var/group2)
-#       Ex 1 (FC ttest):            hcp_fc_t_malerest_femalerest.mat
-#       Ex 2 (activation ttest):    hcp_act_t_emotion_rest.mat
-#   - Variables:
-#       correlation: r: mx1,  p: mx1, std_x: 1xm
-#       t-test:      p: 1xm,  ci: 2xm,  stats.tstat: 1xm, n: 1    if ttest2, instead of n: n1, n2
-#   - Study script names: (matfile name).m
-#
-##############################################
+#   - study_info (table)
+#       - basefile
+#       - folder
+#       - name
+#       - ext
+#       - dataset
+#       - map_type
+#       - orig_stat_type
+#       - test_component_1
+#       - test_component_2
+#       - category
+# 
+#   - brain_masks
+#       - <name>
+#           - mask
+#       - <name>
+#           ...
 
-# Libraries
-source("setparams.R") # USER-DEFINED: review for user-defined parameters
-source("clean_data.R")
-# source("effeX_vis.R") # rely on Hallee's visualizations
+source(file.path(script_dir, 'set_params.R'))
+source(file.path(script_dir, 'clean_data.R'))
+source(file.path(script_dir, 'calc_d.R'))
+source(file.path(script_dir, 'calc_sim_ci.R'))
+source(file.path(script_dir, 'helpers.R'))
 
-# Clean effect maps and combine into single data frame
-# TODO: looks like variables are inherited from setparams.R - may not be the best idea - figure out some separation
-# access e.g., with cleaned_data$effect_map
-cleaned_data <- clean_data() # for now, need to run this with skip_nii = TRUE and skip = c("v2") to avoid errors
+# load individual group-level datasets, combine, and clean
+cleaned_data <- clean_data(data_dir, script_dir, 'clean_data', intermediate_dir,
+                           testing=TRUE)
 
-# run QC on the clean data, visualize matrices for FC studies:
-fc_qc(cleaned_data) # outputs FC matrices to QC folder
+# extract data from cleaned_data
+study <- cleaned_data$study
+brain_masks <- cleaned_data$brain_masks
+data <- cleaned_data$data
 
-# # Convert effect maps to d
-d <- calc_d(cleaned_data$study, cleaned_data$effect_map)
+# calculate Cohen's d for each study
+d_maps <- calc_d(study, data, num_sdx_r2d, 'd_maps')
 
-# # Estimate simci
-ci_sim <- estimate_simci(d$effect_map, d$study, alpha)
+# cauculate simultaneous confidence intervals for each study
+sim_ci <- calc_sim_ci(d_maps, alpha, num_sdx_r2d, 'sim_ci_data')
 
-# # Visualize effect maps
-# effeX_vis(d, ci_sim, cleaned_data$study)
-
-## TODO: Make sure these functions pipe into eachother properly! Haven't tested together recently.
+# save the final results
+save(study, sim_ci, brain_masks, file = final_output_path)
