@@ -1,0 +1,23 @@
+# TODO: check all, change to setparams_activation.sh
+
+
+# TODO: see /work/neuroprism/effect_size/scripts/subject_level/prep_subject_level...act
+
+testing=FALSE
+
+# paths and dirs
+out_data_dir='/work/neuroprism/effect_size/data'
+tmp_dir='/scratch/tmp'
+intermediates_dir=$out_data_dir'/level1/hcp_act_intermediates/'
+stat_dir=$out_data_dir'/level1/hcp_act_intermediates/'
+group_stat_dir=$out_data_dir'/studies/'
+design_contrast=$out_data_dir'/studies/hcp_design'
+high_motion_log=$out_data_dir'/studies/hcp_act_high_motion'
+
+
+# params
+task_contrast_pairs='REST','EMOTION'
+
+motion_method_params = 'none', 'regression' , 'threshold'
+
+

@@ -1,9 +1,18 @@
 # calculate_effeX
-Calculate effect size precursors to effect size explorer
+Calculate effect size results across studies for BrainEffeX
 
-## master.R includes all steps
-To summarize...
-1. Clean the data with clean_data.R
-2. Perform QC on the cleaned data with qc.R (produces an html report to visually inspect matrices)
-3. Calculate effect sizes with calc_d.R
-4. Estimate simultaneous confidence intervals with estimate_simci.R
+## 3 steps: subject_level, group_level, combine_gl
+
+### subject_level
+Input: subject-level statistical maps from contributors
+<br>Computes group-level stat maps for each "study"
+
+### group_level
+Input: group-level statistical maps for each "study"
+<br>Calculates effect sizes & other descriptive data for each "study"
+
+
+### combine_gl
+Input: All group level effect size-related data  and "study" details
+<br>Combines and formats data for BrainEffeX
+
