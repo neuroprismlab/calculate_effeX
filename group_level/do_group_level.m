@@ -108,7 +108,7 @@ testing=1;
 if testing
     % run first test of every dataset
     
-    % datasets= {'s_hcp_fc_noble_corr.mat'};
+    datasets= {'s_hcp_fc_noble_corr.mat'};
 
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
@@ -154,6 +154,10 @@ for i = 1:length(datasets)
         tests = tests(1:10);
     end
     
+    if testing
+        test = 'test2';
+    end
+    
     for t = 1:length(tests)
         
         test = tests{t}; 
@@ -163,7 +167,6 @@ for i = 1:length(datasets)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
         results = [];
         results.study_info.dataset = S.study_info.dataset;
-        results.study_info.test = S.study_info.test;
         results.study_info.map = S.study_info.map;
         if isfield(S.study_info, 'mask')
             results.study_info.mask = S.study_info.mask;
@@ -176,6 +179,8 @@ for i = 1:length(datasets)
 
         % infer test type
         test_type = infer_test_type(S, test);
+        
+        results.study_info.test = test_type;
         
         % TMP: skip the test if the test type is t
 %         if strcmp(test_type, "t")
@@ -270,11 +275,12 @@ for i = 1:length(datasets)
         
         elseif strcmp(test_type, 't2')
 
-
             contrast = S.outcome.(test).contrast;
 
             if iscell(contrast) && length(contrast) == 2
-
+                if testing
+                    disp(['running option 1 for t2 for ', test])
+                end
                 % if contrast is length 2, then combine data here and create dummy variable
                 
                 % extract relevant variables
@@ -321,7 +327,9 @@ for i = 1:length(datasets)
 %                 results.study_info.n2 = n2;
 
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
-                
+                if testing
+                    disp(['running option 2 for t2 for ', test])
+                end
                 % else if contrast is NaN, then data is already combined -> use outcome score as dummy variable
                 
                 % extract relevant variables
@@ -341,14 +349,7 @@ for i = 1:length(datasets)
 
                 % get test components and add to results
                 results.study_info.test_components = {condition, score_label};
-                
-%                 % calculate n1 and n2
-%                 n1 = sum(S.outcome.(test).score==1);
-%                 n2 = sum(S.outcome.(test).score==0);
-%                 
-%                 % save n1 and n2
-%                 results.study_info.n1 = n1;
-%                 results.study_info.n2 = n2;
+               
 
             end
         end
