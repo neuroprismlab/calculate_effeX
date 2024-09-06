@@ -69,6 +69,8 @@
 #       - <name>
 #           ...
 
+script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl'
+
 source(file.path(script_dir, 'set_params.R'))
 source(file.path(script_dir, 'clean_data.R'))
 source(file.path(script_dir, 'calc_d.R'))

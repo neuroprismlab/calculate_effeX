@@ -19,7 +19,9 @@ clean_data <- function(data_dir = data_dir,
   mat_file_names <- basename(mat_files)
   
   if (testing) {
+    #mat_file_names <- mat_file_names[grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
     mat_file_names <- mat_file_names[grep("^04-Sep", mat_file_names)]
+    mat_file_names <- mat_file_names[-grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
   }
   
   # create empty dataframe for study info
@@ -78,6 +80,8 @@ clean_data <- function(data_dir = data_dir,
     brain_masks[[name]]$mask <- data$results$study.info$mask
     
   }
-  save(study, stat_maps, brain_masks, file = output_path)
+  if (!testing) {
+    save(study, stat_maps, brain_masks, file = output_path)
+  }
   return(list(study = study, data = stat_maps, brain_masks = brain_masks))
 }

@@ -104,7 +104,7 @@ addpath(regression_fast_script_path);
 
 
 % testing stuff
-testing=1;
+testing=0;
 if testing
     % run first test of every dataset
     
@@ -121,7 +121,7 @@ if testing
 %this_score='age'; % TODO: remove when done testing
 
 end
-res_prefix = date; % appended to the start of each result file
+res_prefix = [date, '_']; % appended to the start of each result file
 
 
 %% Calculate effects for each test of each dataset
@@ -155,7 +155,7 @@ for i = 1:length(datasets)
     end
     
     if testing
-        test = 'test2';
+        tests = tests(2);
     end
     
     for t = 1:length(tests)
@@ -522,7 +522,8 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
     % Run regression across each brain variable
 
     if do_t_test
-        % design matrix representing group ID or intercept is predictor - standard design for t-test 
+        % design matrix representing group ID or intercept is predictor - standard design for t-test
+        
         
        if strcmp(test_type, 't') % can't use corr, need intercept
 
