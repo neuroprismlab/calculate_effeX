@@ -101,7 +101,7 @@ function [m, score, varargout] = remove_missing_subs(m, score, S, test_type, tes
 
             % reorder
             m = m(cond1_idx,:);
-            score = score(cond2_idx);
+            score = score(cond2_idx,:);
             motion1 = motion1(motion1_idx);
             motion2 = motion2(motion2_idx);
             varargout{1} = motion1;

@@ -104,11 +104,11 @@ addpath(regression_fast_script_path);
 
 
 % testing stuff
-testing=0;
+testing=1;
 if testing
     % run first test of every dataset
     
-    datasets= {'s_hcp_fc_noble_corr.mat'};
+    datasets= datasets(5);
 
     % if ukb data, pooling_params = [0] because we don't have a map
     % if activation, also skipping pooling- TODO: reinstate when done testing
@@ -152,10 +152,6 @@ for i = 1:length(datasets)
     % TMP: for testing one specific test
     if testing && dataset == "s_pnc_fc_ye.mat"
         tests = tests(1:10);
-    end
-    
-    if testing
-        tests = tests(2);
     end
     
     for t = 1:length(tests)
@@ -529,8 +525,8 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
 
             mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
             
-            b_standardized = mdl(:,1,1);
-            p = mdl(:,1,2);
+            b_standardized = mdl(:,:,1); % STEPH: I changed this from mdl(:,1,1) because b_standardized was just one number, is this okay?
+            p = mdl(:,:,2);
 
         else %t2
             if isempty(confounds)
