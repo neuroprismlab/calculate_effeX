@@ -1,4 +1,4 @@
-function [p, h1]= Hotelling_T2_Test(X,alpha,mu)
+function [T2, p]= Hotelling_T2_Test(X,alpha,mu)
 %Hotelling's T-Squared test for one multivariate sample. 
 %
 %   Syntax: function [T2Hot1] = T2Hot1(X,alpha) 
@@ -81,6 +81,7 @@ function [p, h1]= Hotelling_T2_Test(X,alpha,mu)
 %              3rd. ed. New-Jersey:Prentice Hall. pp. 180-181,199-200.
 %
 % Modified by Jesus Perez-Ortega May 2019
+% Modified by Stephanie Noble August 2024 to change output args for effect size calc: add T2 stat and remove h1
 [n,p]=size(X);
 switch nargin 
     case 1
