@@ -73,14 +73,11 @@
 
 % script and data directories
 
-scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts/';  % TODO: future - automatically get current folder
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
-%data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624 - % TODO: remove when done testing
 data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
-% script paths
-atlas_tools_script_path = [scripts_dir,'atlas_tools']; % for pooling (structure_data, summarize_data)
-regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multiple regression
+current_file = mfilename('fullpath');
+scripts_dir = [fileparts(current_file),'/helper_scripts/'];
 
 % params
 
@@ -97,10 +94,7 @@ filenames = filenames(~[filenames.isdir]);  % Remove directories from the list
 datasets = {filenames.name}; 
 
 % set paths
-
-%addpath(data_loader_script_path); % USER-DEFINED
-addpath(genpath(atlas_tools_script_path));
-addpath(regression_fast_script_path);
+addpath(genpath(scripts_dir));
 
 
 
