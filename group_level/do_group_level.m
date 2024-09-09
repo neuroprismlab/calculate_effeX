@@ -552,7 +552,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
 
             % 3. Hotelling t-test 
             [t_sq,p] = Hotelling_T2_Test(brain2); 
-            t = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+            b_standardized = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
             
             % d=t --> same result as from a direct estimate of d (sample):
             % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
@@ -579,7 +579,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             end
 
             % 3. Canonical Correlation (top component)
-            [brain_comp,score_comp,r,~,~,stats] = canoncorr(brain2,score2);
+            [brain_comp,score_comp,b_standardized,~,~,stats] = canoncorr(brain2,score2);
             p = stats.pChisq; % TODO: compare with look up from Winkler et al table
             %d = 2*r/sqrt(1-r^2); % TODO: confirm
 
