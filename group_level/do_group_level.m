@@ -86,7 +86,7 @@ low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
 multivariate_params = [0, 1];
-
+testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -96,27 +96,14 @@ datasets = {filenames.name};
 % set paths
 addpath(genpath(scripts_dir));
 
+% setup for tests
 
-
-% testing stuff
-testing=1;
 if testing
-    % run first test of every dataset
-    
-    % datasets= {'s_hcp_fc_noble_corr.mat'};
-
-    % if ukb data, pooling_params = [0] because we don't have a map
-    % if activation, also skipping pooling- TODO: reinstate when done testing
-    % TODO: TMP: change this once we have a ukb map
-%     if contains(datasets, "ukb") ||  contains(datasets, "act")
-%         pooling_params = [0];
-%     end
-    % TODO: for now we still want to not pool ukb and act even when not
-    % testing
-%this_score='age'; % TODO: remove when done testing
-
+    datasets= {'s_hcp_fc_noble_corr.mat'};
+    testing_str='_test';
+else
+    testing_str=[];
 end
-res_prefix = date; % appended to the start of each result file
 
 
 %% Calculate effects for each test of each dataset
@@ -347,8 +334,9 @@ for i = 1:length(datasets)
 
             end
         end
-        
-        results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', strjoin(results.study_info.test_components, '_')];
+
+
+        results_file_prefix = [results_dir, strjoin(S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, [date, testing_str], '_')];
 
 
 
