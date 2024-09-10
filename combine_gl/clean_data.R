@@ -20,7 +20,7 @@ clean_data <- function(data_dir = data_dir,
   
   if (testing) {
     #mat_file_names <- mat_file_names[grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
-    mat_file_names <- mat_file_names[grepl("^06-Sep", mat_file_names)]
+    mat_file_names <- mat_file_names[grepl("Sep", mat_file_names)]
     #mat_file_names <- mat_file_names[-grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
   }
   

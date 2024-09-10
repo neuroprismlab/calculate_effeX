@@ -236,6 +236,12 @@ for i = 1:length(datasets)
                
                 % get test components and add to results
                 results.study_info.test_components = {condition};
+                
+                % if brain mask is here, save it
+                if isfield(S.brain_data.(condition), 'mask')
+                    results.study_info.mask = S.brain_data.(condition).mask;
+                end
+                 
  
             else % paired t-test
 
@@ -266,6 +272,11 @@ for i = 1:length(datasets)
                 
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
+                
+                % if brain mask is here, save it
+                %if isfield(S.brain_data.(condition), 'mask')
+                %    results.study_info.mask = S.brain_data.(condition).mask;
+                %end % TODO: which condition's mask to use??
         
             end
         
@@ -525,8 +536,10 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
 
             mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
             
-            b_standardized = mdl(:,:,1); % STEPH: I changed this from mdl(:,1,1) because b_standardized was just one number, is this okay?
-            p = mdl(:,:,2);
+            b_standardized = mdl(1,:,1);
+            
+            %b_standardized = mdl(:,:,1); % STEPH: I changed this from mdl(:,1,1) because b_standardized was just one number, is this okay? I think
+            p = mdl(1,:,2);
 
         else %t2
             if isempty(confounds)
