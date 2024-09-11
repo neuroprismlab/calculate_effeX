@@ -45,7 +45,7 @@
 %       - <test_components> (e.g., {'condition_label', 'score_label'}
 %       - map
 %       - test
-%       - mask % TODO: there will be one for each brain condition
+%       - mask
 %       - category
 %   - data
 %       - <pooling strategy>
@@ -57,13 +57,6 @@
 %                 - n         ------------ NaN if two-sample
 %                 - n1        ------------ NaN if one-sample
 %                 - n2        ------------ NaN if one-sample
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% TODO: results_file_prefix naming convention - {dataset name}_{contributor name}_{date}
-%       subject level: level1 + {date}
-%       group level: study, effect map, level2, or group + {date}
-%       combined: combined_effect_{date}
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -98,16 +91,16 @@ addpath(genpath(scripts_dir));
 % setup for tests
 
 if testing
-    datasets= {'s_hcp_fc_noble_corr.mat'};
-    testing_str='_test';
+    datasets = {'s_hcp_fc_noble_corr.mat'};
+    testing_str ='test';
 else
-    testing_str=[];
+    testing_str = [];
 end
 
 
 %% Calculate effects for each test of each dataset
 
-% TODO: loop through outcomes, and get data according to each test / outcome name
+disp(upper(testing_str))
 
 for i = 1:length(datasets)
    
@@ -130,8 +123,8 @@ for i = 1:length(datasets)
 
     tests = fieldnames(S.outcome);
     
-    % TMP: for testing one specific test
-    if testing && dataset == "s_pnc_fc_ye.mat"
+    % TODO: TMP: for testing one specific test, figure out and remove
+    if dataset == "s_pnc_fc_ye.mat"
         tests = tests(1:10);
     end
     
@@ -159,12 +152,6 @@ for i = 1:length(datasets)
         
         results.study_info.test = test_type;
         
-        % TMP: skip the test if the test type is t
-%         if strcmp(test_type, "t")
-%             disp(['skipping test ', test, ' because test type is t'])
-%             continue
-%         end
-
 
         % For each test type, extract and clean data
 
@@ -336,7 +323,7 @@ for i = 1:length(datasets)
         end
 
 
-        results_file_prefix = [results_dir, strjoin(S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, [date, testing_str], '_')];
+        results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, date, testing_str], '_')];
 
 
 
@@ -385,20 +372,8 @@ for i = 1:length(datasets)
 
                     if ~strcmp(motion_method,'none')
 
-            %            % Align motion and data by subject - REMOVED 051624
-            %            
-            %            % align motion subIDs to data subIDs (removes subjects who do not have data or scoreavior)
-            %            subids_motion = load(motion_subids_file);
-            %            [subids,idx_matrices,idx_motion] = intersect(subids_data,subids_motion,'stable');
-            %            if ~isequal(subids_data,subids_motion(idx_motion)); error('Matrix and motion intersected subject IDs don''t match. Likely subjects with matrices are missing motion.'); end;
-            %            
-            %            % load motion and index based on above alignment
-            %            sub_motion = load(motion_file);
-            %            sub_motion = sub_motion(idx_motion); % get subs with matrices
-            %
-            %            std_sub_motion = std(sub_motion); % TODO: save this or full motion vector
-            %            mean_sub_motion = mean(sub_motion); % TODO: save this or full motion vector
-
+                        % Align motion and data by subject - REMOVED 051624  (removed the commented lines lines that align subjects) - TODO: check + confirm the checker uses similar logic as the removed lines
+            
                         % threshold if specified
                         if strcmp(motion_method,'threshold')
                             low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
@@ -457,12 +432,6 @@ for i = 1:length(datasets)
         % Save all results for this test
         save([results_file_prefix,'.mat'], 'results');
        
-        % previous results filenames for reference - TODO: delete when done
-        %results_file_prefix = [results_dir,'ukb_fc_t_rest_age__v2']; % see naming convention
-        %results_file_prefix = [results_dir,strrep(['ukb_fc_test_rest_age__v2'], ' ', '_')']; % see naming convention
-        % results_file_prefix = [results_dir, 'test_fc_r_rest']; 
-
-
     end % tests
 end % datasets
 
@@ -491,7 +460,6 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
     end
    
     % adjust design and which coefficient results to extract based on test type
-    % TODO: clean up. There's a little more logic here than I think is needed
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
         
