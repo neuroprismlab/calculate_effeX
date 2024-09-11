@@ -73,14 +73,11 @@
 
 % script and data directories
 
-scripts_dir = '/home/h.shearer/hallee/calculate_effeX/group_level/helper_scripts/';  % TODO: future - automatically get current folder
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
-%data_filename = '/work/neuroprism/data_shared/ukb/ukb_data_steph.mat'; % ADDED 051624 - % TODO: remove when done testing
 data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
-% script paths
-atlas_tools_script_path = [scripts_dir,'atlas_tools']; % for pooling (structure_data, summarize_data)
-regression_fast_script_path = [scripts_dir,'regression_fast']; % for fast multiple regression
+current_file = mfilename('fullpath');
+scripts_dir = [fileparts(current_file),'/helper_scripts/'];
 
 % params
 
@@ -88,7 +85,7 @@ motion_method_params = {'none', 'regression', 'threshold'};
 low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
-
+testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -96,32 +93,16 @@ filenames = filenames(~[filenames.isdir]);  % Remove directories from the list
 datasets = {filenames.name}; 
 
 % set paths
+addpath(genpath(scripts_dir));
 
-%addpath(data_loader_script_path); % USER-DEFINED
-addpath(genpath(atlas_tools_script_path));
-addpath(regression_fast_script_path);
+% setup for tests
 
-
-
-% testing stuff
-testing=1;
 if testing
-    % run first test of every dataset
-    
-    datasets= datasets(5);
-
-    % if ukb data, pooling_params = [0] because we don't have a map
-    % if activation, also skipping pooling- TODO: reinstate when done testing
-    % TODO: TMP: change this once we have a ukb map
-%     if contains(datasets, "ukb") ||  contains(datasets, "act")
-%         pooling_params = [0];
-%     end
-    % TODO: for now we still want to not pool ukb and act even when not
-    % testing
-%this_score='age'; % TODO: remove when done testing
-
+    datasets= {'s_hcp_fc_noble_corr.mat'};
+    testing_str='_test';
+else
+    testing_str=[];
 end
-res_prefix = [date, '_']; % appended to the start of each result file
 
 
 %% Calculate effects for each test of each dataset
@@ -271,12 +252,11 @@ for i = 1:length(datasets)
         
         elseif strcmp(test_type, 't2')
 
+
             contrast = S.outcome.(test).contrast;
 
             if iscell(contrast) && length(contrast) == 2
-                if testing
-                    disp(['running option 1 for t2 for ', test])
-                end
+
                 % if contrast is length 2, then combine data here and create dummy variable
                 
                 % extract relevant variables
@@ -323,9 +303,7 @@ for i = 1:length(datasets)
 %                 results.study_info.n2 = n2;
 
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
-                if testing
-                    disp(['running option 2 for t2 for ', test])
-                end
+                
                 % else if contrast is NaN, then data is already combined -> use outcome score as dummy variable
                 
                 % extract relevant variables
@@ -345,117 +323,130 @@ for i = 1:length(datasets)
 
                 % get test components and add to results
                 results.study_info.test_components = {condition, score_label};
-               
+                
+%                 % calculate n1 and n2
+%                 n1 = sum(S.outcome.(test).score==1);
+%                 n2 = sum(S.outcome.(test).score==0);
+%                 
+%                 % save n1 and n2
+%                 results.study_info.n1 = n1;
+%                 results.study_info.n2 = n2;
 
             end
         end
+
+
+        results_file_prefix = [results_dir, strjoin(S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, [date, testing_str], '_')];
+
+
+
+        %% Run analysis for each do_pooling + motion + do_multivariate method
+
+        %for do_multivariate = multivariate_params
         
-        results_file_prefix = [results_dir, res_prefix, S.study_info.dataset, '_', S.study_info.map, '_', test_type, '_', strjoin(results.study_info.test_components, '_')];
+            for do_pooling = pooling_params
 
+                %% Do large-scale pooling if specified
 
-
-
-        %% Run analysis for each pooling + motion method
-
-        for do_pooling = pooling_params
-
-            %% Do large-scale pooling if specified
-
-            if do_pooling
-                m2 = []; 
-                triumask=logical(triu(ones(n_network_groups)));  
-                for s = 1:size(m,1) % over subjects
-                    tr = structure_data(m(s,:),'triangleside','upper');
-                    t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
-                    m2(s,:) = t2(triumask);
-                end
-
-                % update results file prefix
-                % results_file_prefix2 = [results_file_prefix,'__by_net'];
-
-                % set pooling_method for naming
-                pooling_method = 'net';
-
-            else
-                % results_file_prefix2 = results_file_prefix;
-                m2 = m;
-
-                % set pooling_method for naming
-                pooling_method = 'none';
-            end
-
-            disp(['   > pooling = ', pooling_method])
-
-
-            for motion_method_it = 1:length(motion_method_params)
-
-                %% Account/correct for motion as specified
-
-                motion_method = motion_method_params{motion_method_it};
-                disp(['     > motion method = ', motion_method])
-
-                score2 = score; % changes if applying motion threshold
-
-                if ~strcmp(motion_method,'none')
-
-        %            % Align motion and data by subject - REMOVED 051624
-        %            
-        %            % align motion subIDs to data subIDs (removes subjects who do not have data or scoreavior)
-        %            subids_motion = load(motion_subids_file);
-        %            [subids,idx_matrices,idx_motion] = intersect(subids_data,subids_motion,'stable');
-        %            if ~isequal(subids_data,subids_motion(idx_motion)); error('Matrix and motion intersected subject IDs don''t match. Likely subjects with matrices are missing motion.'); end;
-        %            
-        %            % load motion and index based on above alignment
-        %            sub_motion = load(motion_file);
-        %            sub_motion = sub_motion(idx_motion); % get subs with matrices
-        %
-        %            std_sub_motion = std(sub_motion); % TODO: save this or full motion vector
-        %            mean_sub_motion = mean(sub_motion); % TODO: save this or full motion vector
-
-                    % threshold if specified
-                    if strcmp(motion_method,'threshold')
-                        low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
-                        m2 = m2(low_motion_idx,:);
-                        if ~isempty(score2)
-                            score2 = score2(low_motion_idx);
-                        end
-                        std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
-                        mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
-                        % TODO: consider saving number of subjects who are above motion threshold
+                if do_pooling
+                    m2 = []; 
+                    triumask=logical(triu(ones(n_network_groups)));  
+                    for s = 1:size(m,1) % over subjects
+                        tr = structure_data(m(s,:),'triangleside','upper');
+                        t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
+                        m2(s,:) = t2(triumask);
                     end
 
                     % update results file prefix
-                    % results_file_prefix3=[results_file_prefix2,'__with_motion_',motion_method];
+                    % results_file_prefix2 = [results_file_prefix,'__by_net'];
 
-                end
+                    % set pooling_method for naming
+                    pooling_method = 'net';
 
-
-                %% Run regression
-
-                if strcmp(motion_method,'regression')
-                    % include motion as a confound
-                    [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2,motion);
                 else
-                    [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,m2,score2);
+                    % results_file_prefix2 = results_file_prefix;
+                    m2 = m;
+
+                    % set pooling_method for naming
+                    pooling_method = 'none';
                 end
 
+                disp(['   > pooling = ', pooling_method])
 
-                %% Append results data
 
-                result_name = ['pooling_', pooling_method, '_motion_', motion_method];
-                results.data.(result_name).b_standardized = b_standardized;
-                results.data.(result_name).p = p;
-                results.data.(result_name).n = n;
-                results.data.(result_name).std_brain = std_brain;
-                results.data.(result_name).std_score = std_score;
-                results.data.(result_name).pooling_method = pooling_method;
-                results.data.(result_name).motion_method = motion_method;
-                
-                
+                for motion_method_it = 1:length(motion_method_params)
 
-            end
-        end
-        
+                    %% Account/correct for motion as specified
+
+                    motion_method = motion_method_params{motion_method_it};
+                    disp(['     > motion method = ', motion_method])
+
+                    score2 = score; % changes if applying motion threshold
+
+                    if ~strcmp(motion_method,'none')
+
+            %            % Align motion and data by subject - REMOVED 051624
+            %            
+            %            % align motion subIDs to data subIDs (removes subjects who do not have data or scoreavior)
+            %            subids_motion = load(motion_subids_file);
+            %            [subids,idx_matrices,idx_motion] = intersect(subids_data,subids_motion,'stable');
+            %            if ~isequal(subids_data,subids_motion(idx_motion)); error('Matrix and motion intersected subject IDs don''t match. Likely subjects with matrices are missing motion.'); end;
+            %            
+            %            % load motion and index based on above alignment
+            %            sub_motion = load(motion_file);
+            %            sub_motion = sub_motion(idx_motion); % get subs with matrices
+            %
+            %            std_sub_motion = std(sub_motion); % TODO: save this or full motion vector
+            %            mean_sub_motion = mean(sub_motion); % TODO: save this or full motion vector
+
+                        % threshold if specified
+                        if strcmp(motion_method,'threshold')
+                            low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
+                            m2 = m2(low_motion_idx,:);
+                            if ~isempty(score2)
+                                score2 = score2(low_motion_idx);
+                            end
+                            std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            % TODO: consider saving number of subjects who are above motion threshold
+                        end
+
+                        % update results file prefix
+                        % results_file_prefix3=[results_file_prefix2,'__with_motion_',motion_method];
+
+                    end
+
+
+                    %% Run regression
+                    %if do_multivariate
+                    %    test_type=['multi_',test_type];
+                    %    % TODO: consider whether safe to overwrite
+                    %end
+
+                    if strcmp(motion_method,'regression')
+                        % include motion as a confound
+                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                    else
+                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2);
+                    end
+
+                    %% Append results data
+
+                    result_name = ['pooling_', pooling_method, '_motion_', motion_method];
+                    results.data.(result_name).b_standardized = b_standardized;
+                    results.data.(result_name).p = p;
+                    results.data.(result_name).n = n;
+                    results.data.(result_name).std_brain = std_brain;
+                    results.data.(result_name).std_score = std_score;
+                    results.data.(result_name).pooling_method = pooling_method;
+                    results.data.(result_name).motion_method = motion_method;
+                    
+                    
+
+                end % motion
+            end % pooling
+        %end % multivariate
+
         % if category provided for the test, save
         if isfield(S.outcome.(test), 'category')
             results.study_info.category = S.outcome.(test).category;
@@ -472,8 +463,8 @@ for i = 1:length(datasets)
         % results_file_prefix = [results_dir, 'test_fc_r_rest']; 
 
 
-    end
-end
+    end % tests
+end % datasets
 
 
 
@@ -483,13 +474,9 @@ end
 
 %% Function definitions
 
-% set up function for univariate y~x with optional confound as predictor
+% NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 
-% NOTE: it may be tempting to use a stepwise procedure - estimate the residuals of m ~ motion, then use those residuals for subsequently estimating betas - but residualizing in this way biases effect size estimates towards zero (i.e., conservative), particularly with higher collinearity in predictors. Instead, including the confound in the actual model should be preferred as unbiased (though also note higher variance with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x
-%   i.e., avoid: mdl = fitlm(brain, confound); brain = mdl.Residuals;
-
-
-function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_results(test_type,brain,score,confounds)
+function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
    
@@ -505,30 +492,27 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
    
     % adjust design and which coefficient results to extract based on test type
     % TODO: clean up. There's a little more logic here than I think is needed
-    if strcmp(test_type, 't2')
-        do_t_test=1;
-    elseif strcmp(test_type, 't')
-        do_t_test=1;
-        score=[]; % because score is just single group ID, but we already have this in the intercept
-        std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result
-    else
-        do_t_test=0;
-    end
-        
-    % Run regression across each brain variable
-
-    if do_t_test
-        % design matrix representing group ID or intercept is predictor - standard design for t-test
+    switch test_type
+        % Run mass univariate tests (for each brain region) or multivariate tests
         
         
-       if strcmp(test_type, 't') % can't use corr, need intercept
-
-            mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
+        
+        case 't'
+            % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             
-            b_standardized = mdl(:,:,1); % STEPH: I changed this from mdl(:,1,1) because b_standardized was just one number, is this okay?
-            p = mdl(:,:,2);
+            score=[]; % because score is just single group ID, but we already have this in the intercept
+            std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result
+    
+            % need intercept so can't use corr
+            mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
+            b_standardized = mdl(1,:,1);
+            p = mdl(1,:,2);
 
-        else %t2
+        
+        
+        case 't2'
+            % Standard 2-Sample t-Testi (Mass Univariate): group ID is predictor, brain is outcome
+        
             if isempty(confounds)
                 [b_standardized,p]=corr(brain,score);
             else
@@ -536,21 +520,72 @@ function [b_standardized,p,n,std_brain,std_score] = save_univariate_regression_r
             end
      
             % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
-            % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise 
-        end
-    
-    else
+            % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
 
-        % score is outcome - standard design for correlation
 
-        if isempty(confounds)
-            [b_standardized,p]=corr(score,brain);
-        else
-            [b_standardized,p]=partialcorr(score,brain,confounds);
-        end
-   
+
+        case 'r'
+            % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
+        
+            if isempty(confounds)
+                [b_standardized,p]=corr(score,brain);
+            else
+                [b_standardized,p]=partialcorr(score,brain,confounds);
+            end
+
+
+        %{
+        case 'multi_t'
+            %  Hotelling t-Test (Multivariate): brain is outcome
+
+            % 1. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced]=pca(brain,'NumComponents',n_components,'Centered','off'); % make sure not to center - we're measuring dist from 0!
+
+            % 2. Optional: regress confounds from brain
+            if isempty(confounds)
+                brain2 = brain_reduced;
+            else
+                confound_centered = confound - mean(confound);
+                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
+                brain2 = brain_reduced - P_confound * brain_reduced;
+            end
+
+            % 3. Hotelling t-test 
+            [t_sq,p] = Hotelling_T2_Test(brain2); 
+            b_standardized = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+            
+            % d=t --> same result as from a direct estimate of d (sample):
+            % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
+            % and same p as from manova1:
+            % [~, p, ~] = manova1(brain2, ones(size(brain2, 1), 1));
+
+
+
+        case {'multi_t2', 'multi_r'}
+            % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
+
+            % 1. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced]=pca(brain,'NumComponents',n_components);
+
+            % 2. Optional: regress confounds from brain and score
+            if isempty(confounds)
+                brain2=brain_reduced;
+                score2=score;
+            end
+                confound_centered = confound - mean(confound);
+                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
+                brain2 = brain_reduced - P_confound * brain_reduced;
+                score2 = score - P_confound * score;
+            end
+
+            % 3. Canonical Correlation (top component)
+            [brain_comp,score_comp,b_standardized,~,~,stats] = canoncorr(brain2,score2);
+            p = stats.pChisq; % TODO: compare with look up from Winkler et al table
+            %d = 2*r/sqrt(1-r^2); % TODO: confirm
+        %}
+
+
     end
-
 end
             
 
