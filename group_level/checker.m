@@ -143,7 +143,7 @@ function S = checker(S)
                 % TODO: should check whether there are nans (any case) as string
 
                 keys = [0, 1];
-                values = unique(S.outcome.(test).score);
+                values = categories(unique(S.outcome.(test).score));
 
                 level_map = [];
                 for idx = 1:length(keys)
