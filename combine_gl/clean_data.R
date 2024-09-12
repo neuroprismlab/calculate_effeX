@@ -37,9 +37,14 @@ clean_data <- function(data_dir = data_dir,
   # create empty list for brain masks
   brain_masks <- list()
   
+  it=0
   # loop through all file names
   for (file in mat_file_names) {
-    print(c("loading file ", file))
+    #print(c("loading file ", file))
+    it=it+1
+    if ((it%%10) == 0) {
+      print(paste(it,' loaded'))
+    }
     # load the file
     mat_struct = readMat(file.path(data_dir, file))
     data <- assign_names(mat_struct)
@@ -55,6 +60,9 @@ clean_data <- function(data_dir = data_dir,
     # Check if there are more than one test components and assign accordingly
     if (length(study_info$test.components) > 1) {
       test_component_2 <- study_info$test.components[[2]][[1]]
+    }
+    if (study_info$map == "act") {
+      test_component_2 <- "rest" # TODO: this is a temporary fix, should build this into do_group_level
     }
     
     name = sub("\\.mat$", "", file)
@@ -81,6 +89,13 @@ clean_data <- function(data_dir = data_dir,
     
     # add brain mask to brain_masks
     brain_masks[[name]]$mask <- data$results$study.info$mask
+    
+    if (length(grep('act',file))>0) {
+      # print('hello')
+      # print(dim(data$results$study.info$mask))
+      # print(file.path(data_dir, file))
+      # break
+    }
     
   }
   if (testing) {
