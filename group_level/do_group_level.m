@@ -204,6 +204,12 @@ for i = 1:length(datasets)
                
                 % get test components and add to results
                 results.study_info.test_components = {condition};
+                
+                % if brain mask is here, save it
+                if isfield(S.brain_data.(condition), 'mask')
+                    results.study_info.mask = S.brain_data.(condition).mask;
+                end
+                 
  
             else % paired t-test
 
