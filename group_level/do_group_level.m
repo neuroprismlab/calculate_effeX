@@ -375,7 +375,7 @@ for i = 1:length(datasets)
 
                         m2 = [];
                         for s = 1:size(m,1) % over subjects
-                             m2(s,:) = average_within_3d_atlas(m(s,:)', shen_nets, 0);
+                             m2(s,:) = average_within_atlas(m(s,:)', shen_nets, 0);
                         end
 
                     end

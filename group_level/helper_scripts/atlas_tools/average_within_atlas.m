@@ -1,4 +1,4 @@
-function data_avg = average_within_3d_atlas(data,atlas,return_structured)
+function data_avg = average_within_atlas(data,atlas,return_structured)
 % average map within predefined regions of atlas
 %
 % input:    atlas: n x m integer matrix
