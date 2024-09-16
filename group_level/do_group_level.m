@@ -10,15 +10,17 @@
 %
 %   - study_info
 %       - dataset
-%       - test
 %       - map
-%       - brain_mask
+%       - test
+%       - [mask] ---------------- if mask is the same across all conditions; otherwise set below
 %   - brain_data
 %       - <name of condition 1>
 %           - sub_ids
 %           - data -------------- last dim is n_sub long
 %           - sub_ids_motion
 %           - motion
+%           - [mask] ------------ if mask differs by condition; otherwise set above
+%           - [mask_hdr] -------- for nifti files
 %       - <name of condition 2>
 %           ...
 %   - outcome
@@ -29,6 +31,7 @@
 %           - reference_condition
 %           - contrast ---------- 2D cell array, for t-test between brain data conditions
 %           - category ---------- demographic, cognitive, biometric, psychiatric, etc.
+%           - [level_map] ------- number-to-string map for binary or categorical score (including ref level)
 %       - test2
 %           ...
 %
@@ -42,11 +45,13 @@
 %
 %   - study_info
 %       - dataset
-%       - <test_components> (e.g., {'condition_label', 'score_label'}
 %       - map
-%       - test
-%       - mask
 %       - category
+%       - mask
+%       - [mask_hdr]
+%       - test
+%       - test_components ------- (e.g., {'condition_label', 'score_label'}
+%       - [level_map]
 %   - data
 %       - <pooling strategy>
 %            - <motion strategy>
@@ -54,9 +59,9 @@
 %                 - p
 %                 - std_brain
 %                 - std_score
-%                 - n         ------------ NaN if two-sample
-%                 - n1        ------------ NaN if one-sample
-%                 - n2        ------------ NaN if one-sample
+%                 - [n]         ------------ NaN if two-sample
+%                 - [n1]        ------------ NaN if one-sample
+%                 - [n2]        ------------ NaN if one-sample
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -69,8 +74,8 @@
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
 data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
-current_file = mfilename('fullpath');
-scripts_dir = [fileparts(current_file),'/helper_scripts/'];
+[current_dir,~,~] = fileparts(mfilename('fullpath'));
+scripts_dir = [current_dir,'/helper_scripts/'];
 
 % params
 
@@ -92,6 +97,7 @@ addpath(genpath(scripts_dir));
 
 if testing
     datasets = {'s_hcp_fc_noble_corr.mat'};
+    pooling_params = [1];
     testing_str ='test';
 else
     testing_str = [];
@@ -107,11 +113,16 @@ for i = 1:length(datasets)
     dataset = datasets{i};
     fprintf(['Processing dataset: ',dataset,'\n'])
     
-    %TODO: TMP: remove this once we get ukb map and figure out act pooling
-    if contains(dataset, "ukb") ||  contains(dataset, "act")
+    %TODO: TMP: remove this once we get ukb map
+    if contains(dataset, "ukb")
+        if ~exist('pooling_params_orig')
+            pooling_params_orig = pooling_params;
+        end
         pooling_params = [0];
     else
-        pooling_params = [0,1];
+        if exist('pooling_params_orig')
+            pooling_params = pooling_params_orig;
+        end
     end
     
     % load & check data
@@ -135,21 +146,11 @@ for i = 1:length(datasets)
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
-        results = [];
-        results.study_info.dataset = S.study_info.dataset;
-        results.study_info.map = S.study_info.map;
-        if isfield(S.study_info, 'mask')
-            results.study_info.mask = S.study_info.mask;
-        elseif isfield(S.study_info, 'brain_mask')% TODO: make sure all input is mask not brain_mask
-            results.study_info.mask = S.study_info.brain_mask;
-        end %TODO: move to checker (to change brain_mask to mask)
+        results.study_info = rmfield(S.study_info,'test');
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
-
-        % infer test type
         test_type = infer_test_type(S, test);
-        
         results.study_info.test = test_type;
         
 
@@ -208,6 +209,7 @@ for i = 1:length(datasets)
                 % if brain mask is here, save it
                 if isfield(S.brain_data.(condition), 'mask')
                     results.study_info.mask = S.brain_data.(condition).mask;
+                    results.study_info.mask_hdr = S.brain_data.(condition).mask_hdr;
                 end
                  
  
@@ -342,14 +344,37 @@ for i = 1:length(datasets)
                 %% Do large-scale pooling if specified
 
                 if do_pooling
-                    m2 = []; 
-                    triumask=logical(triu(ones(n_network_groups)));  
-                    for s = 1:size(m,1) % over subjects
-                        tr = structure_data(m(s,:),'triangleside','upper');
-                        t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
-                        m2(s,:) = t2(triumask);
-                    end
+                    
+                    if strcmp(results.study_info.map,'fc')
+                        
+                        triumask = logical(triu(ones(n_network_groups)));  
+                        m2 = []; 
+                        for s = 1:size(m,1) % over subjects
+                            tr = structure_data(m(s,:),'triangleside','upper');
+                            t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
+                            m2(s,:) = t2(triumask);
+                        end
+                        
+                        % TODO: above triumask should be read from the provided mask to avoid accidents
+                    
+                    elseif strcmp(results.study_info.map,'act')
 
+                        % load, dilate, and mask shen network atlas
+                        % for now, we're using an appromiximate mapping without fully registering since we're working with large-scale networks
+                        shen_nets_filename = [current_dir,'/helper_scripts/atlas_tools/atlas_mappings/shen_1mm_268_parcellation__in_subnetworks.nii.gz'];
+                        shen_nets = niftiread(shen_nets_filename);
+                        shen_nets = imdilate(shen_nets, strel('cube', 3)); % to appx 
+                        shen_nets = imresize3(shen_nets, 0.5,'Method','nearest'); % to
+                        shen_nets = shen_nets(find(results.study_info.mask)); % let's work with data in the reduced dims of mask, not full 3D
+                        % niftiwrite(shen_nets,[results_dir,'dilated_shen_nets.nii']) % run before the previous line
+                        % niftiwrite(double(results.study_info.mask),[results_dir,'tmp_msk.nii'])  
+
+                        m2 = [];
+                        for s = 1:size(m,1) % over subjects
+                             m2(s,:) = average_within_atlas(m(s,:)', shen_nets, 0);
+                        end
+
+                    end
                     % update results file prefix
                     % results_file_prefix2 = [results_file_prefix,'__by_net'];
 
@@ -488,9 +513,9 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Standard 2-Sample t-Testi (Mass Univariate): group ID is predictor, brain is outcome
         
             if isempty(confounds)
-                [b_standardized,p]=corr(brain,score);
+                [b_standardized,p]=corr(brain,score,'rows','complete');
             else
-                [b_standardized,p]=partialcorr(brain,score,confounds);
+                [b_standardized,p]=partialcorr(brain,score,confounds,'rows','complete');
             end
      
             % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
@@ -502,9 +527,9 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
         
             if isempty(confounds)
-                [b_standardized,p]=corr(score,brain);
+                [b_standardized,p]=corr(score,brain,'rows','complete');
             else
-                [b_standardized,p]=partialcorr(score,brain,confounds);
+                [b_standardized,p]=partialcorr(score,brain,confounds,'rows','complete');
             end
 
 
