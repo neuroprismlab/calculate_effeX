@@ -69,8 +69,8 @@
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
 data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
-current_file = mfilename('fullpath');
-scripts_dir = [fileparts(current_file),'/helper_scripts/'];
+[current_dir,~,~] = fileparts(mfilename('fullpath'));
+scripts_dir = [current_dir,'/helper_scripts/'];
 
 % params
 
@@ -92,6 +92,7 @@ addpath(genpath(scripts_dir));
 
 if testing
     datasets = {'s_hcp_fc_noble_corr.mat'};
+    pooling_params = [1];
     testing_str ='test';
 else
     testing_str = [];
@@ -107,11 +108,16 @@ for i = 1:length(datasets)
     dataset = datasets{i};
     fprintf(['Processing dataset: ',dataset,'\n'])
     
-    %TODO: TMP: remove this once we get ukb map and figure out act pooling
-    if contains(dataset, "ukb") ||  contains(dataset, "act")
+    %TODO: TMP: remove this once we get ukb map
+    if contains(dataset, "ukb")
+        if ~exist('pooling_params_orig')
+            pooling_params_orig = pooling_params;
+        end
         pooling_params = [0];
     else
-        pooling_params = [0,1];
+        if exist('pooling_params_orig')
+            pooling_params = pooling_params_orig;
+        end
     end
     
     % load & check data
@@ -342,14 +348,37 @@ for i = 1:length(datasets)
                 %% Do large-scale pooling if specified
 
                 if do_pooling
-                    m2 = []; 
-                    triumask=logical(triu(ones(n_network_groups)));  
-                    for s = 1:size(m,1) % over subjects
-                        tr = structure_data(m(s,:),'triangleside','upper');
-                        t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
-                        m2(s,:) = t2(triumask);
-                    end
+                    
+                    if strcmp(results.study_info.map,'fc')
+                        
+                        triumask = logical(triu(ones(n_network_groups)));  
+                        m2 = []; 
+                        for s = 1:size(m,1) % over subjects
+                            tr = structure_data(m(s,:),'triangleside','upper');
+                            t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
+                            m2(s,:) = t2(triumask);
+                        end
+                        
+                        % TODO: above triumask should be read from the provided mask to avoid accidents
+                    
+                    elseif strcmp(results.study_info.map,'act')
 
+                        % load, dilate, and mask shen network atlas
+                        % for now, we're using an appromiximate mapping without fully registering since we're working with large-scale networks
+                        shen_nets_filename = [current_dir,'/helper_scripts/atlas_tools/atlas_mappings/shen_1mm_268_parcellation__in_subnetworks.nii.gz'];
+                        shen_nets = niftiread(shen_nets_filename);
+                        shen_nets = imdilate(shen_nets, strel('cube', 3)); % to appx 
+                        shen_nets = imresize3(shen_nets, 0.5,'Method','nearest'); % to
+                        shen_nets = shen_nets(find(results.study_info.mask)); % let's work with data in the reduced dims of mask, not full 3D
+                        % niftiwrite(shen_nets,[results_dir,'dilated_shen_nets.nii']) % run before the previous line
+                        % niftiwrite(double(results.study_info.mask),[results_dir,'tmp_msk.nii'])  
+
+                        m2 = [];
+                        for s = 1:size(m,1) % over subjects
+                             m2(s,:) = average_within_3d_atlas(m(s,:)', shen_nets, 0);
+                        end
+
+                    end
                     % update results file prefix
                     % results_file_prefix2 = [results_file_prefix,'__by_net'];
 
