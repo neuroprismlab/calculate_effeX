@@ -517,9 +517,9 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Standard 2-Sample t-Testi (Mass Univariate): group ID is predictor, brain is outcome
         
             if isempty(confounds)
-                [b_standardized,p]=corr(brain,score);
+                [b_standardized,p]=corr(brain,score,'rows','complete');
             else
-                [b_standardized,p]=partialcorr(brain,score,confounds);
+                [b_standardized,p]=partialcorr(brain,score,confounds,'rows','complete');
             end
      
             % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
@@ -531,9 +531,9 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
         
             if isempty(confounds)
-                [b_standardized,p]=corr(score,brain);
+                [b_standardized,p]=corr(score,brain,'rows','complete');
             else
-                [b_standardized,p]=partialcorr(score,brain,confounds);
+                [b_standardized,p]=partialcorr(score,brain,confounds,'rows','complete');
             end
 
 
