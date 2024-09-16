@@ -10,15 +10,17 @@
 %
 %   - study_info
 %       - dataset
-%       - test
 %       - map
-%       - brain_mask
+%       - test
+%       - [mask] ---------------- if mask is the same across all conditions; otherwise set below
 %   - brain_data
 %       - <name of condition 1>
 %           - sub_ids
 %           - data -------------- last dim is n_sub long
 %           - sub_ids_motion
 %           - motion
+%           - [mask] ------------ if mask differs by condition; otherwise set above
+%           - [mask_hdr] -------- for nifti files
 %       - <name of condition 2>
 %           ...
 %   - outcome
@@ -29,6 +31,7 @@
 %           - reference_condition
 %           - contrast ---------- 2D cell array, for t-test between brain data conditions
 %           - category ---------- demographic, cognitive, biometric, psychiatric, etc.
+%           - [level_map] ------- number-to-string map for binary or categorical score (including ref level)
 %       - test2
 %           ...
 %
@@ -42,11 +45,13 @@
 %
 %   - study_info
 %       - dataset
-%       - <test_components> (e.g., {'condition_label', 'score_label'}
 %       - map
-%       - test
-%       - mask
 %       - category
+%       - mask
+%       - [mask_hdr]
+%       - test
+%       - test_components ------- (e.g., {'condition_label', 'score_label'}
+%       - [level_map]
 %   - data
 %       - <pooling strategy>
 %            - <motion strategy>
@@ -54,9 +59,9 @@
 %                 - p
 %                 - std_brain
 %                 - std_score
-%                 - n         ------------ NaN if two-sample
-%                 - n1        ------------ NaN if one-sample
-%                 - n2        ------------ NaN if one-sample
+%                 - [n]         ------------ NaN if two-sample
+%                 - [n1]        ------------ NaN if one-sample
+%                 - [n2]        ------------ NaN if one-sample
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -141,21 +146,11 @@ for i = 1:length(datasets)
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
-        results = [];
-        results.study_info.dataset = S.study_info.dataset;
-        results.study_info.map = S.study_info.map;
-        if isfield(S.study_info, 'mask')
-            results.study_info.mask = S.study_info.mask;
-        elseif isfield(S.study_info, 'brain_mask')% TODO: make sure all input is mask not brain_mask
-            results.study_info.mask = S.study_info.brain_mask;
-        end %TODO: move to checker (to change brain_mask to mask)
+        results.study_info = rmfield(S.study_info,'test');
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
-
-        % infer test type
         test_type = infer_test_type(S, test);
-        
         results.study_info.test = test_type;
         
 
@@ -214,6 +209,7 @@ for i = 1:length(datasets)
                 % if brain mask is here, save it
                 if isfield(S.brain_data.(condition), 'mask')
                     results.study_info.mask = S.brain_data.(condition).mask;
+                    results.study_info.mask_hdr = S.brain_data.(condition).mask_hdr;
                 end
                  
  
