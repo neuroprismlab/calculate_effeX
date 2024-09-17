@@ -496,7 +496,15 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
     n = size(brain,1);
     std_brain = std(brain);
     std_score = std(score);
-    
+
+    if strcmp(test_type,'multi')
+        n_components = floor(n/50);
+        n_vars = size(brain,2);
+        if n_components > n_vars
+            n_components = n_vars;
+        end
+    end
+
     if nargin==3
         confounds=[];
     elseif ~nargin==4
@@ -551,7 +559,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             %  Hotelling t-Test (Multivariate): brain is outcome
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50), 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
+            [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain
             if isempty(confounds)
@@ -577,7 +585,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50)); % aiming for 50 samples/feature for stable results a la Helmer et al.
+            [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain and score
             if isempty(confounds)
