@@ -13,6 +13,7 @@
 %       - map
 %       - test
 %       - [mask] ---------------- if mask is the same across all conditions; otherwise set below
+%       - date
 %   - brain_data
 %       - <name of condition 1>
 %           - sub_ids
@@ -152,6 +153,8 @@ for i = 1:length(datasets)
         end
         test_type = infer_test_type(S, test);
         results.study_info.test = test_type;
+
+        results.study_info.date = date;
         
 
         % For each test type, extract and clean data
@@ -331,7 +334,7 @@ for i = 1:length(datasets)
         end
 
 
-        results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, date, testing_str], '_')];
+        results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, testing_str], '_')];
 
 
 
