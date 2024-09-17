@@ -572,7 +572,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
-            end
+            else
                 confound_centered = confound - mean(confound);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
