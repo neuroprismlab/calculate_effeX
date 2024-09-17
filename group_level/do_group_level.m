@@ -513,7 +513,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
         
         
         case 't2'
-            % Standard 2-Sample t-Testi (Mass Univariate): group ID is predictor, brain is outcome
+            % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
         
             if isempty(confounds)
                 [b_standardized,p]=corr(brain,score,'rows','complete');
@@ -540,7 +540,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             %  Hotelling t-Test (Multivariate): brain is outcome
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced]=pca(brain,'NumComponents',n_components,'Centered','off'); % make sure not to center - we're measuring dist from 0!
+            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50), 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain
             if isempty(confounds)
@@ -566,7 +566,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced]=pca(brain,'NumComponents',n_components);
+            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50)); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain and score
             if isempty(confounds)
