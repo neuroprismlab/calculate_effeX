@@ -18,11 +18,11 @@ clean_data <- function(data_dir = data_dir,
   # Get only the file names
   mat_file_names <- basename(mat_files)
   
-  if (testing) {
-    #mat_file_names <- mat_file_names[grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
-    mat_file_names <- mat_file_names[grepl("Sep", mat_file_names)]
-    #mat_file_names <- mat_file_names[-grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
-  }
+  # if (testing) {
+  #   #mat_file_names <- mat_file_names[grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
+  #   mat_file_names <- mat_file_names[grepl("Sep", mat_file_names)]
+  #   #mat_file_names <- mat_file_names[-grep("^04-Sep-2024hcp_fc_t2_REST_Gender", mat_file_names)]
+  # }
   
   # create empty dataframe for study info
   column_names <- c("basefile", "folder", "name", "ext", "dataset", "map_type",

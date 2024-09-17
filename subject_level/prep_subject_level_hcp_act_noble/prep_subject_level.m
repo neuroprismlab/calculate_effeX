@@ -71,6 +71,7 @@ for task_idx=1:size(task_contrast_pairs,1)
 
     % preallocate
     D = niftiread(fullfile(mask_files(1).folder, mask_files(1).name));
+    mask_hdr = niftiinfo(fullfile(mask_files(1).folder, mask_files(1).name));
     mask_4D = zeros([size(D), numel(mask_files)]);
     mask_4D(:,:,:,1) = D;
 
@@ -118,6 +119,7 @@ for task_idx=1:size(task_contrast_pairs,1)
     brain_data.(this_condition).sub_ids = subids_brain; 
     brain_data.(this_condition).data = D; % last dim is n_sub long
     brain_data.(this_condition).mask = mask;
+    brain_data.(this_condition).mask_hdr = mask_hdr;
     %study_info.mask = mask; % TODO: decide whether to provide a mask per condition in data, provide one overall in study_info, or either
     %niftiwrite(mask, [out_dir,task_contrast_pairs{1},'_',task_contrast_pairs{2},'group_mask.nii']);
 
