@@ -85,7 +85,7 @@ low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
 multivariate_params = [0, 1];
-testing=1; % USER-DEFINED
+testing=0; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -99,7 +99,7 @@ addpath(genpath(scripts_dir));
 
 if testing
     datasets = {'s_hcp_fc_noble_corr.mat'};
-    pooling_params = [1];
+    %pooling_params = [1];
     testing_str ='test';
 else
     testing_str = [];
@@ -145,6 +145,9 @@ for i = 1:length(datasets)
         
         test = tests{t}; 
         disp(['Running test "', test,'"'])
+        
+        % clear results struct from last loop
+        results = [];
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
@@ -342,7 +345,14 @@ for i = 1:length(datasets)
         %% Run analysis for each do_pooling + motion + do_multivariate method
 
         for do_multivariate = multivariate_params
-        
+            if do_multivariate
+                        test_type=['multi_',test_type];
+                        % TODO: consider whether safe to overwrite
+                        mv_test_type = test_type;
+            else
+                mv_test_type = 'none';
+            end
+            
             for do_pooling = pooling_params
 
                 %% Do large-scale pooling if specified
@@ -426,10 +436,10 @@ for i = 1:length(datasets)
 
 
                     %% Run regression
-                    if do_multivariate
-                        test_type=['multi_',test_type];
-                        % TODO: consider whether safe to overwrite
-                    end
+%                     if do_multivariate
+%                         test_type=['multi_',test_type];
+%                         % TODO: consider whether safe to overwrite
+%                     end
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
@@ -440,7 +450,7 @@ for i = 1:length(datasets)
 
                     %% Append results data
 
-                    result_name = ['pooling_', pooling_method, '_motion_', motion_method];
+                    result_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
                     results.data.(result_name).b_standardized = b_standardized;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
@@ -448,6 +458,7 @@ for i = 1:length(datasets)
                     results.data.(result_name).std_score = std_score;
                     results.data.(result_name).pooling_method = pooling_method;
                     results.data.(result_name).motion_method = motion_method;
+                    results.data.(result_name).mv_method = mv_test_type;
                     
                     
 
@@ -485,7 +496,15 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
     n = size(brain,1);
     std_brain = std(brain);
     std_score = std(score);
-    
+
+    if strcmp(test_type,'multi')
+        n_components = floor(n/50);
+        n_vars = size(brain,2);
+        if n_components > n_vars
+            n_components = n_vars;
+        end
+    end
+
     if nargin==3
         confounds=[];
     elseif ~nargin==4
@@ -540,13 +559,13 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             %  Hotelling t-Test (Multivariate): brain is outcome
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50), 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
+            [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain
             if isempty(confounds)
                 brain2 = brain_reduced;
             else
-                confound_centered = confound - mean(confound);
+                confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
             end
@@ -566,14 +585,14 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
             % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', floor(n/50)); % aiming for 50 samples/feature for stable results a la Helmer et al.
+            [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
             % 2. Optional: regress confounds from brain and score
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
             else
-                confound_centered = confound - mean(confound);
+                confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
                 score2 = score - P_confound * score;
