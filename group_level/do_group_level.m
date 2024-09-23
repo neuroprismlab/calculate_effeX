@@ -98,9 +98,9 @@ addpath(genpath(scripts_dir));
 % setup for tests
 
 if testing
-    datasets = {'s_hcp_fc_noble_corr.mat'};
+    datasets = datasets(7);
     %pooling_params = [1];
-    testing_str ='test';
+    testing_str = 'test';
 else
     testing_str = [];
 end
@@ -493,7 +493,7 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
     std_brain = std(brain);
     std_score = std(score);
 
-    if strcmp(test_type,'multi')
+    if contains(test_type,'multi')
         n_components = floor(n/50);
         n_vars = size(brain,2);
         if n_components > n_vars
@@ -587,11 +587,21 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
+                % remove any subjects with nan values
+                nans = sum(isnan(brain2),2) > 0;
+                brain2 = brain2(~nans,:);
+                score2 = score2(~nans,:);
             else
+                nans = sum(isnan(brain),2) > 0;
+                brain_reduced = brain_reduced(~nans,:);
+                score = score(~nans,:);
+                confounds = confounds(~nans,:);
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
                 score2 = score - P_confound * score;
+                % remove any subjects with nan values
+                
             end
 
             % 3. Canonical Correlation (top component)
