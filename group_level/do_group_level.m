@@ -296,14 +296,6 @@ for i = 1:length(datasets)
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
                 
-%                 % calculate n1 and n2
-%                 n1 = sum(S.outcome.(test).score==1);
-%                 n2 = sum(S.outcome.(test).score==0);
-%                 
-%                 % save n1 and n2
-%                 results.study_info.n1 = n1;
-%                 results.study_info.n2 = n2;
-
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
                 
                 % else if contrast is NaN, then data is already combined -> use outcome score as dummy variable
@@ -314,6 +306,14 @@ for i = 1:length(datasets)
                 motion = S.brain_data.(condition).motion;
                 score = S.outcome.(test).score;
                 score_label = S.outcome.(test).score_label;
+
+                % map score to {0,1} for regression
+                score = +(score == max(score));
+                
+                % TODO: need level_map for interpretation
+                %if isfield(results.study_info ,'level_map')
+                %    results.study_info.level_map;
+                %end 
 
                 % check brain dims are n_subs x n_parcels, otherwise flip % TODO: dim checking should be added to checker, and then we just flip here
                 if size(m,2) == length(S.brain_data.(condition).sub_ids)
@@ -326,14 +326,6 @@ for i = 1:length(datasets)
                 % get test components and add to results
                 results.study_info.test_components = {condition, score_label};
                 
-%                 % calculate n1 and n2
-%                 n1 = sum(S.outcome.(test).score==1);
-%                 n2 = sum(S.outcome.(test).score==0);
-%                 
-%                 % save n1 and n2
-%                 results.study_info.n1 = n1;
-%                 results.study_info.n2 = n2;
-
             end
         end
 
@@ -443,9 +435,9 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
                     else
-                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2);
+                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
 
                     %% Append results data
@@ -454,6 +446,8 @@ for i = 1:length(datasets)
                     results.data.(result_name).b_standardized = b_standardized;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
+                    results.data.(result_name).n1 = n1;
+                    results.data.(result_name).n2 = n2;
                     results.data.(result_name).std_brain = std_brain;
                     results.data.(result_name).std_score = std_score;
                     results.data.(result_name).pooling_method = pooling_method;
@@ -489,11 +483,13 @@ end % datasets
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 
-function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,score,confounds)
+function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
    
     n = size(brain,1);
+    n1 = NaN;
+    n2 = NaN;
     std_brain = std(brain);
     std_score = std(score);
 
@@ -605,6 +601,12 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
 
 
     end
+
+    if contains('t2',test_type)
+        n1 = sum(score==0);
+        n2 = sum(score==1);
+    end
+
 end
             
 
