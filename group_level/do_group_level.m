@@ -553,6 +553,10 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
 
         case 'multi_t'
             %  Hotelling t-Test (Multivariate): brain is outcome
+            
+            % 0. Remove incomplete cases
+            complete_cases = all(~isnan(brain), 2);
+            brain = brain(complete_cases,:);
 
             % 1. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
@@ -561,7 +565,11 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             if isempty(confounds)
                 brain2 = brain_reduced;
             else
-                confound_centered = confounds - mean(confounds);
+                % filter again for complete cases
+                complete_cases_confounds = all(~isnan(confounds), 2);
+                brain_reduced = brain_reduced(complete_cases_confounds,:);
+
+ confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
             end
@@ -580,6 +588,11 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
+            % 0. Remove incomplete cases
+            complete_cases = all(~isnan(brain), 2) & all(~isnan(score), 2);
+            brain = brain(complete_cases,:);
+            score = score(complete_cases,:);
+
             % 1. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
@@ -587,20 +600,17 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
-                % remove any subjects with nan values
-                nans = sum(isnan(brain2),2) > 0;
-                brain2 = brain2(~nans,:);
-                score2 = score2(~nans,:);
             else
-                nans = sum(isnan(brain),2) > 0;
-                brain_reduced = brain_reduced(~nans,:);
-                score = score(~nans,:);
-                confounds = confounds(~nans,:);
+                % filter again for complete cases
+                complete_cases_confounds = all(~isnan(confounds), 2);
+                brain_reduced = brain_reduced(complete_cases_confounds,:);
+                score = score(complete_cases_confounds,:);
+
+                confounds = confounds(complete_cases,:); % filter for only complete cases
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
                 score2 = score - P_confound * score;
-                % remove any subjects with nan values
                 
             end
 
