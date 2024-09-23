@@ -33,12 +33,12 @@ function test_type = infer_test_type(S, test)
                 condition1 = S.outcome.(test).contrast{1};
                 %condition2 = NaN;
                 test_type='t';
-            else
+            elseif length(S.outcome.(test).contrast)==2
                 condition1 = S.outcome.(test).contrast{1};
                 condition2 = S.outcome.(test).contrast{2};
             
                 % if both conditions of the contrast have some of the same sub ids, test is t
-                % Note: this will assign "t" even if just one sub ID is repeated
+                % Note: this will assign "t" even if just one sub ID is repeated, e.g., accidentally
                 if ~isempty(intersect(S.brain_data.(condition1).sub_ids, S.brain_data.(condition2).sub_ids))
                     test_type = 't';
                 % otherwise, t2
@@ -47,6 +47,8 @@ function test_type = infer_test_type(S, test)
                     condition2 = S.outcome.(test).contrast{2};
                     test_type = 't2';
                 end
+            else 
+                error('Contrast provided - expected one or two conditions but more than two conditions given.') 
             end
         end
     else
