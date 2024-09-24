@@ -20,8 +20,8 @@ function test_type = infer_test_type(S, test)
         
         % if both "conditions" of the score have the same sub ids -> t; otherwise t2
         unique_conditions = unique(S.outcome.(test).score);
-        sub_ids_cond1 = S.brain_data.(test).sub_ids(S.outcome.(test).score==unique_conditions(1));
-        sub_ids_cond2 = S.brain_data.(test).sub_ids(S.outcome.(test).score==unique_conditions(2));
+        sub_ids_cond1 = S.outcome.(test).sub_ids(S.outcome.(test).score==unique_conditions(1));
+        sub_ids_cond2 = S.outcome.(test).sub_ids(S.outcome.(test).score==unique_conditions(2));
         
         if all(ismember(sub_ids_cond1, sub_ids_cond2)) && all(ismember(sub_ids_cond2, sub_ids_cond1))
             test_type = 't';
