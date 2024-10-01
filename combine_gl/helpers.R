@@ -327,6 +327,19 @@ add_phen <- function(study, effect_maps, phen_file = "/work/neuroprism/effect_si
 
 library(R.matlab)
 
+# very special correction for readMat bug with nested lists
+# WARNING: sadly, this is very idiosyncratic to the way the data was saved
+# Unfortunately we aren't authors of the original readMat function, but it'd
+# be nice to have a more elegant workaround
+readMat_act_correction <- function(mat_struct) {
+  mat_struct[[1]][[1]][[7]][[24]] <- mat_struct[[1]][[1]][[8]]
+  mat_struct[[1]][[1]][[8]] <- mat_struct[[1]][[2]]
+  mat_struct[[1]][[2]] <- mat_struct[[2]]
+  mat_struct[[3]] <- NULL
+  mat_struct[[2]] <- NULL
+  return(mat_struct)
+}
+
 # Define a function to automatically assign names to the sublists
 assign_names <- function(mat_list) {
   # Extract the top-level names
