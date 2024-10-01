@@ -97,14 +97,11 @@ study <- cleaned_data$study
 brain_masks <- cleaned_data$brain_masks
 data <- cleaned_data$data
 
-# calculate Cohen's d for each study
-d_maps <- calc_d(study, data, num_sdx_r2d, 'd_maps')
-
-# cauculate simultaneous confidence intervals for each study
-sim_ci <- calc_sim_ci(d_maps, alpha, num_sdx_r2d, 'sim_ci_data')
+# calculate Cohen's d and simultaneous confidence intervals for each study
+d_maps <- calc_d(study, data, output_dir = intermediate_dir)
 
 # checker to check dimensions (and probably more things eventually)
-data <- checker(sim_ci)
+data <- checker(d_maps)
 
 # save the final results
 save(study, data, brain_masks, file = final_output_path)
