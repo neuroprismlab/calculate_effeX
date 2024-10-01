@@ -43,7 +43,7 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
         },
         
         "t2" = {
-          d <- b_std / sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
+          d <- b_std * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
           # TODO: catch this error earlier, maybe in checker:
           if (!is.null(d_maps[[i]][[t]]$n1[1])) {
           ci <- sapply(b_std, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
