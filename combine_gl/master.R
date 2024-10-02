@@ -69,14 +69,24 @@
 #       - <name>
 #           ...
 
-script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl'
 
-source(file.path(script_dir, 'set_params.R'))
-source(file.path(script_dir, 'clean_data.R'))
-source(file.path(script_dir, 'calc_d.R'))
-source(file.path(script_dir, 'calc_sim_ci.R'))
-source(file.path(script_dir, 'helpers.R'))
-source(file.path(script_dir, 'checker.R'))
+# Source everything else in the present directory
+script_dir <- dirname(script_path <- normalizePath(sys.frame(1)$ofile))
+script_filenames <- list.files(script_dir, pattern = "\\.R$", full.names = TRUE)
+script_filenames <- script_filenames[basename(script_filenames) != basename(script_path)] # skip this script
+script_filenames <- script_filenames[basename(script_filenames) != 'testing_helper.R'] # skip testing_helper
+for (file in script_filenames) {
+  source(file)
+}
+
+#script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl' # TODO - test+remove
+
+#source(file.path(script_dir, 'set_params.R'))
+#source(file.path(script_dir, 'clean_data.R'))
+#source(file.path(script_dir, 'calc_d.R'))
+#source(file.path(script_dir, 'calc_sim_ci.R'))
+#source(file.path(script_dir, 'helpers.R'))
+#source(file.path(script_dir, 'checker.R'))
 
 # load individual group-level datasets, combine, and clean
 cleaned_data <- clean_data(data_dir, script_dir, 'clean_data', intermediate_dir,
@@ -87,14 +97,11 @@ study <- cleaned_data$study
 brain_masks <- cleaned_data$brain_masks
 data <- cleaned_data$data
 
-# calculate Cohen's d for each study
-d_maps <- calc_d(study, data, num_sdx_r2d, 'd_maps')
-
-# cauculate simultaneous confidence intervals for each study
-sim_ci <- calc_sim_ci(d_maps, alpha, num_sdx_r2d, 'sim_ci_data')
+# calculate Cohen's d and simultaneous confidence intervals for each study
+d_maps <- calc_d(study, data, output_dir = intermediate_dir)
 
 # checker to check dimensions (and probably more things eventually)
-data <- checker(sim_ci)
+data <- checker(d_maps)
 
 # save the final results
 save(study, data, brain_masks, file = final_output_path)

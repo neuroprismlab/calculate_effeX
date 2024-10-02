@@ -39,9 +39,13 @@ clean_data <- function(data_dir = data_dir,
   
   # loop through all file names
   for (file in mat_file_names) {
-    print(c("loading file ", file))
+    print(paste("loading", file))
     # load the file
     mat_struct = readMat(file.path(data_dir, file))
+    if (grepl('act', file)) { # special correction for readMat bug (nested lists)
+      mat_struct <- readMat_act_correction(mat_struct)
+    }
+    
     data <- assign_names(mat_struct)
     
     # extract study info
@@ -71,6 +75,7 @@ clean_data <- function(data_dir = data_dir,
     )
     
     # add to study dataframe
+
     study <- rbind(study, new_row)
     
     

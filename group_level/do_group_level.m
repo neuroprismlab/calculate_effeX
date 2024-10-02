@@ -85,6 +85,8 @@ low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
 multivariate_params = [0, 1];
+save_info.use_same = 0;
+save_info.asked = 0;
 testing=0; % USER-DEFINED
 
 % get list of input data filenames
@@ -127,8 +129,43 @@ for i = 1:length(datasets)
         end
     end
     
-    % load & check data
+    % Check results exist and prompt overwrite
+
     data_path = [data_dir, dataset];
+
+    S = load(data_path,'study_info');
+    results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map}, '_'),'*'];
+    save_info.overwrite = 1;
+    
+    if ~isempty(dir(results_file_pre_prefix))
+        if ~save_info.asked || ~save_info.use_same
+
+            user_response = input(sprintf(['Results for ',results_file_pre_prefix,' already exist. Overwrite? [yes/no]\n> ']),'s');
+            if strcmp(user_response,'yes')
+                fprintf(['Replacing results ',results_file_pre_prefix,'.\n']);
+                save_info.overwrite = 1;
+            else
+                fprintf(['Keeping existing results ',results_file_pre_prefix,'.\n']);
+                save_info.overwrite = 0;
+            end
+
+            if ~save_info.asked
+                user_response = input(sprintf(['Repeat for all datasets? [yes/no]\n> ']),'s');
+                if strcmp(user_response,'yes')
+                    fprintf('Using this setting for all.\n');
+                    save_info.use_same = 1;
+                else
+                    fprintf('Okay, will ask each time.\n');
+                   save_info.use_same = 0;
+               end
+               save_info.asked = 1;
+            end
+        end
+    end
+       
+    if save_info.overwrite
+    % Load & check data
+
     S = load(data_path);
     S = checker(S);
 
@@ -140,7 +177,8 @@ for i = 1:length(datasets)
     if dataset == "s_pnc_fc_ye.mat"
         tests = tests(1:10);
     end
-    
+
+
     for t = 1:length(tests)
         
         test = tests{t}; 
@@ -296,14 +334,6 @@ for i = 1:length(datasets)
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
                 
-%                 % calculate n1 and n2
-%                 n1 = sum(S.outcome.(test).score==1);
-%                 n2 = sum(S.outcome.(test).score==0);
-%                 
-%                 % save n1 and n2
-%                 results.study_info.n1 = n1;
-%                 results.study_info.n2 = n2;
-
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
                 
                 % else if contrast is NaN, then data is already combined -> use outcome score as dummy variable
@@ -314,6 +344,14 @@ for i = 1:length(datasets)
                 motion = S.brain_data.(condition).motion;
                 score = S.outcome.(test).score;
                 score_label = S.outcome.(test).score_label;
+
+                % map score to {0,1} for regression
+                score = +(score == max(score));
+                
+                % TODO: need level_map for interpretation
+                %if isfield(results.study_info ,'level_map')
+                %    results.study_info.level_map;
+                %end 
 
                 % check brain dims are n_subs x n_parcels, otherwise flip % TODO: dim checking should be added to checker, and then we just flip here
                 if size(m,2) == length(S.brain_data.(condition).sub_ids)
@@ -326,21 +364,13 @@ for i = 1:length(datasets)
                 % get test components and add to results
                 results.study_info.test_components = {condition, score_label};
                 
-%                 % calculate n1 and n2
-%                 n1 = sum(S.outcome.(test).score==1);
-%                 n2 = sum(S.outcome.(test).score==0);
-%                 
-%                 % save n1 and n2
-%                 results.study_info.n1 = n1;
-%                 results.study_info.n2 = n2;
-
             end
         end
 
 
         results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, testing_str], '_')];
 
-
+        
 
         %% Run analysis for each do_pooling + motion + do_multivariate method
 
@@ -443,9 +473,9 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
                     else
-                        [b_standardized,p,n,std_brain,std_score] = run_test(test_type,m2,score2);
+                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
 
                     %% Append results data
@@ -454,12 +484,13 @@ for i = 1:length(datasets)
                     results.data.(result_name).b_standardized = b_standardized;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
+                    results.data.(result_name).n1 = n1;
+                    results.data.(result_name).n2 = n2;
                     results.data.(result_name).std_brain = std_brain;
                     results.data.(result_name).std_score = std_score;
                     results.data.(result_name).pooling_method = pooling_method;
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
-                    
                     
 
                 end % motion
@@ -477,6 +508,7 @@ for i = 1:length(datasets)
         save([results_file_prefix,'.mat'], 'results');
        
     end % tests
+    end % overwrite
 end % datasets
 
 
@@ -489,14 +521,57 @@ end % datasets
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 
-function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,score,confounds)
+function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
-   
-    n = size(brain,1);
-    std_brain = std(brain);
-    std_score = std(score);
 
+    % Check arguments
+    if nargin==3
+        confounds=[];
+    elseif ~nargin==4
+        error('%d arguments provided but only 3 or 4 allowed.',nargin)
+    end
+
+    % Remove incomplete cases
+    if contains(test_type, 'r') || contains(test_type, 't2')
+        if isempty(confounds)
+            complete_cases = all(~isnan(brain), 2) & all(~isnan(score), 2);
+            brain = brain(complete_cases,:);
+            score = score(complete_cases,:);
+        else % include confounds
+            complete_cases = all(~isnan(brain), 2) & all(~isnan(score), 2) & all(~isnan(confounds), 2);
+            brain = brain(complete_cases,:);
+            score = score(complete_cases,:);
+            confounds = confounds(complete_cases,:); 
+        end 
+    else % 't' - ignore score
+       if isempty(confounds)
+            complete_cases = all(~isnan(brain), 2);
+            brain = brain(complete_cases,:);
+        else % include confounds
+            complete_cases = all(~isnan(brain), 2) & all(~isnan(confounds), 2);
+            brain = brain(complete_cases,:);
+            confounds = confounds(complete_cases,:); 
+        end 
+    end
+
+    % Assign basic attributes
+    n = size(brain,1);
+    if contains(test_type,'t2') % 2 groups only exist for t2
+        n1 = sum(score==0);
+        n2 = sum(score==1);
+    else
+        n1 = NaN;
+        n2 = NaN;
+    end
+    std_brain = std(brain);
+    if contains(test_type,'t2') || contains(test_type,'r') % score only exists for t2 & r
+        std_score = std(score);
+    else
+        std_score = NaN;
+    end
+     
+    % Setup for multivariate
     if contains(test_type,'multi')
         n_components = floor(n/50);
         n_vars = size(brain,2);
@@ -504,40 +579,31 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             n_components = n_vars;
         end
     end
+ 
 
-    if nargin==3
-        confounds=[];
-    elseif ~nargin==4
-        error('%d arguments provided but only 3 or 4 allowed.',nargin)
-    end
-   
-    % adjust design and which coefficient results to extract based on test type
+    % Perform test and get results
+    
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
         
-        
-        
         case 't'
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
-            
-            score=[]; % because score is just single group ID, but we already have this in the intercept
-            std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result
-    
+           
             % need intercept so can't use corr
-            mdl = Regression_fast_mass_univ_y([ones(n,1), score, confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
+            n = size(brain,1);
+            mdl = Regression_fast_mass_univ_y([ones(n,1), confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
 
             b_standardized = mdl(1,:,1);
             p = mdl(1,:,2);
+            std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result % TODO: this isn't used after all - remove
 
-        
-        
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
-        
+            
             if isempty(confounds)
-                [b_standardized,p]=corr(brain,score,'rows','complete');
+                [b_standardized,p]=corr(brain,score);
             else
-                [b_standardized,p]=partialcorr(brain,score,confounds,'rows','complete');
+                [b_standardized,p]=partialcorr(brain,score,confounds);
             end
      
             % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
@@ -547,17 +613,17 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
 
         case 'r'
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
-        
+           
             if isempty(confounds)
-                [b_standardized,p]=corr(score,brain,'rows','complete');
+                [b_standardized,p]=corr(score,brain);
             else
-                [b_standardized,p]=partialcorr(score,brain,confounds,'rows','complete');
+                [b_standardized,p]=partialcorr(score,brain,confounds);
             end
 
 
         case 'multi_t'
             %  Hotelling t-Test (Multivariate): brain is outcome
-
+            
             % 1. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
 
@@ -565,7 +631,7 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             if isempty(confounds)
                 brain2 = brain_reduced;
             else
-                confound_centered = confounds - mean(confounds);
+ confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
             end
@@ -591,20 +657,12 @@ function [b_standardized,p,n,std_brain,std_score] = run_test(test_type,brain,sco
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
-                % remove any subjects with nan values
-                nans = sum(isnan(brain2),2) > 0;
-                brain2 = brain2(~nans,:);
-                score2 = score2(~nans,:);
             else
-                nans = sum(isnan(brain),2) > 0;
-                brain_reduced = brain_reduced(~nans,:);
-                score = score(~nans,:);
-                confounds = confounds(~nans,:);
+                confounds = confounds(complete_cases,:); % filter for only complete cases
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
                 score2 = score - P_confound * score;
-                % remove any subjects with nan values
                 
             end
 
