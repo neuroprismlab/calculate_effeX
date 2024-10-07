@@ -8,13 +8,13 @@ function[Val] = Regression_fast_mass_univ_y(x,y,Pval)
 
 % OUTPUT
 % Val:  Column vector of the estimated coefficients (Pval == false/zero/missing), or
-%       nx2 matrix of the estimated coefficients (first columsn) with p-values (second
-%       column)
+%       nx3 matrix of the estimated coefficients (first columsn) with p-values (second
+%       column) and t-statistics (third column)
 
 % USE
 % Val = Regression_fast(x,y)
 
-% Lightly edited by Stephanie Noble (Aug 2024) to return mass univariate estimates for multiple y simultaneously
+% Lightly edited by Stephanie Noble (Aug 2024) to return mass univariate estimates for multiple y simultaneously, and also to return t-stats
 
 if nargin == 2
     Pval = false;
@@ -34,7 +34,7 @@ if Pval
     
     P   = (T>=0).*(1 - tcdf(T,df))*2 + (T<0).*(tcdf(T,df))*2;
     
-    Val = cat(3,B,P);
+    Val = cat(3,B,P,T);
 end
 
 end
