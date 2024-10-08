@@ -18,14 +18,14 @@ function[T,P] = Regression_fast_mass_univ_y(x,y)
 
 B   = (x'*x)\x'*y;
 
-    y_fit = x*B;
-    df  = -diff(size(x));
+y_fit = x*B;
+df  = -diff(size(x));
 
-    s2 = sum((y-y_fit).^2)/df;
-    %s   = (sum((y-y_fit).^2)/df)^0.5;
-    se = sqrt(diag((x' * x) \ eye(size(x, 2))) * s2);
-    T   = B./se;
-   
-    P = 2 * (1 - tcdf(abs(T), df));
+s2 = sum((y-y_fit).^2)/df;
+%s   = (sum((y-y_fit).^2)/df)^0.5;
+se = sqrt(diag((x' * x) \ eye(size(x, 2))) * s2);
+T   = B./se;
+
+P = 2 * (1 - tcdf(abs(T), df));
 
 end
