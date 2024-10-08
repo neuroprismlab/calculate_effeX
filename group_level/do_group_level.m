@@ -588,27 +588,24 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
         
         case 't'
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
+            % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
-            % need intercept so can't use corr
-            n = size(brain,1);
-            mdl = Regression_fast_mass_univ_y([ones(n,1), confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
-
-            b_standardized = mdl(1,:,1);
-            p = mdl(1,:,2);
-            std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result % TODO: this isn't used after all - remove
+            [b_standardized,p] = Regression_fast_mass_univ_y([ones(n,1), confounds], brain);
+            b_standardized = b_standardized(1,:);
+            p = p(1,:);
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
-                [b_standardized,p]=corr(brain,score);
+                [b_standardized,p] = Regression_fast_mass_univ_y([ones(n,1), score], brain);
+                b_standardized = b_standardized(2,:);
+                p = p(2,:);
             else
                 [b_standardized,p]=partialcorr(brain,score,confounds);
             end
      
-            % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
-
 
 
         case 'r'
@@ -675,4 +672,3 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
     end
 end
             
-
