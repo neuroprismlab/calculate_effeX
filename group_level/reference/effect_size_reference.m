@@ -11,7 +11,9 @@
 
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/../helper_scripts/'];
+scripts_dir2 = [current_dir,'/helper/'];
 addpath(genpath(scripts_dir))
+addpath(genpath(scripts_dir2))
 
 clear all
 
