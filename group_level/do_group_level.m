@@ -56,7 +56,7 @@
 %   - data
 %       - <pooling strategy>
 %            - <motion strategy>
-%                 - b_standardized
+%                 - stat
 %                 - p
 %                 - std_brain
 %                 - std_score
@@ -87,7 +87,7 @@ pooling_params = [0, 1];
 multivariate_params = [0, 1];
 save_info.use_same = 0;
 save_info.asked = 0;
-testing=0; % USER-DEFINED
+testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -473,15 +473,15 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
                     else
-                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
+                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
 
                     %% Append results data
 
                     result_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
-                    results.data.(result_name).b_standardized = b_standardized;
+                    results.data.(result_name).stat = stat;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
                     results.data.(result_name).n1 = n1;
@@ -521,7 +521,7 @@ end % datasets
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 
-function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
+function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -590,19 +590,19 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
-            [b_standardized,p] = Regression_fast_mass_univ_y([ones(n,1), confounds], brain);
-            b_standardized = b_standardized(1,:);
+            [stat,p] = Regression_fast_mass_univ_y([ones(n,1), confounds], brain);
+            stat = stat(1,:);
             p = p(1,:);
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
-                [b_standardized,p] = Regression_fast_mass_univ_y([ones(n,1), score], brain);
-                b_standardized = b_standardized(2,:);
+                [stat,p] = Regression_fast_mass_univ_y([ones(n,1), score], brain);
+                stat = stat(2,:);
                 p = p(2,:);
             else
-                [b_standardized,p]=partialcorr(brain,score,confounds);
+                [stat,p]=partialcorr(brain,score,confounds);
             end
      
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
@@ -612,9 +612,9 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
            
             if isempty(confounds)
-                [b_standardized,p]=corr(score,brain);
+                [stat,p]=corr(score,brain);
             else
-                [b_standardized,p]=partialcorr(score,brain,confounds);
+                [stat,p]=partialcorr(score,brain,confounds);
             end
 
 
@@ -635,7 +635,7 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
 
             % 3. Hotelling t-test 
             [t_sq,p] = Hotelling_T2_Test(brain2); 
-            b_standardized = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+            stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
             
             % d=t --> same result as from a direct estimate of d (sample):
             % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
@@ -664,7 +664,7 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
             end
 
             % 3. Canonical Correlation (top component)
-            [brain_comp,score_comp,b_standardized,~,~,stats] = canoncorr(brain2,score2);
+            [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain2,score2);
             p = stats.pChisq; % TODO: compare with look up from Winkler et al table
             %d = 2*r/sqrt(1-r^2); % TODO: confirm
 
