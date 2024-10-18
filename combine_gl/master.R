@@ -18,7 +18,7 @@
 #   - data
 #       - <pooling strategy>
 #            - <motion strategy>
-#                 - b_standardized
+#                 - stat
 #                 - p
 #                 - std_brain
 #                 - std_score
@@ -34,7 +34,7 @@
 #   - data
 #       - <name>
 #           - <pooling>_<motion>
-#		        			 - b_standardized
+#		        			 - stat
 #                  - p
 #                  - std_brain 
 #                  - std_score 

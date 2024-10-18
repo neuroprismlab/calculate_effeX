@@ -28,9 +28,9 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
 
     for (t in names(d_maps[[i]])) { # unique tests within studies (e.g., w/w-o motion correction)
 
-      b_std <- d_maps[[i]][[t]]$b.standardized
+      stat <- d_maps[[i]][[t]]$stat
       # b_std <- as.numeric(b_std) # TODO: catch this earlier in checker, don't convert
-      alpha_corrected <- alpha / length(b_std)
+      alpha_corrected <- alpha / length(stat)
       
       # calculate d and simultaneous confidence intervals
       
@@ -38,12 +38,12 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
         
         "r" = {
           # TODO: confirm that orig_stat_type for t2 is always 't2', not 'r' for all studies
-          d <- num_sdx_r2d * b_std / ((1 - b_std^2) ^ (1/2))
-          ci <- sapply(b_std, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
+          d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
+          ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
         },
         
         "t2" = {
-          d <- b_std * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
+          d <- stat * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
           # TODO: catch this error earlier, maybe in checker:
           if (!is.null(d_maps[[i]][[t]]$n1[1])) {
           ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
@@ -51,7 +51,7 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
         },
         
         "t" = {
-          d <- b_std / sqrt(d_maps[[i]][[t]]$n[1]);
+          d <- stat / sqrt(d_maps[[i]][[t]]$n[1]);
           ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
         },
 
