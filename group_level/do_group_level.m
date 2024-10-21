@@ -493,6 +493,7 @@ for i = 1:length(datasets)
                     results.data.(result_name).mv_method = mv_test_type;
                     
                     % skeleton for adding other results once incorporated
+                    % TODO: test this when incorporating
 %                     if strcmp(test_type, 't2') || strcmp(test_type, 'r')
 %                         results.data.(result_name).r_sq_full = r_sq_full;
 %                     elseif strcmp(test_type, 'multi_t')
