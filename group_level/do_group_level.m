@@ -492,6 +492,14 @@ for i = 1:length(datasets)
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
                     
+                    % skeleton for adding other results once incorporated
+%                     if strcmp(test_type, 't2') || strcmp(test_type, 'r')
+%                         results.data.(result_name).r_sq_full = r_sq_full;
+%                     elseif strcmp(test_type, 'multi_t')
+%                         results.data.(result_name).omega_sq = omega_sq;
+%                     end
+                        
+                        
 
                 end % motion
             end % pooling
