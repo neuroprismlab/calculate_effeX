@@ -529,6 +529,7 @@ end % datasets
 %% Function definitions
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
+% TODO: this is also the standard analogue to partial corr estimates, as validated by our effect_size_ref_validation. Revisit.
 
 function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
@@ -591,6 +592,10 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
  
 
     % Perform test and get results
+
+    % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
+    % Note: when dealing with confounds, "stat/p" is an estimate of the statistic in a multiple regression framework
+    %       and stat_removeconf / p_removeconf is an estimate of the statistic in the case of zero confounds
     
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
@@ -600,8 +605,14 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
             [stat,p] = Regression_fast_mass_univ_y([ones(n,1), confounds], brain);
+            
             stat = stat(1,:);
             p = p(1,:);
+            
+            if ~isempty(confounds)
+                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
+                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+            end
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
@@ -611,7 +622,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 stat = stat(2,:);
                 p = p(2,:);
             else
-                [stat,p]=partialcorr(brain,score,confounds);
+                [~, stat_removeconf, p_removeconf, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
             end
      
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
@@ -623,7 +634,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             if isempty(confounds)
                 [stat,p]=corr(score,brain);
             else
-                [stat,p]=partialcorr(score,brain,confounds);
+                [stat_removeconf, ~, p_removeconf, stat, ~, p] = partial_and_semipartial_corr(score, brain, confounds, n);
             end
 
 
@@ -633,11 +644,11 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % 1. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
 
-            % 2. Optional: regress confounds from brain
+            % 2. If confounds: regress confounds from brain
             if isempty(confounds)
                 brain2 = brain_reduced;
             else
- confound_centered = confounds - mean(confounds);
+                confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
             end
@@ -645,6 +656,11 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % 3. Hotelling t-test 
             [t_sq,p] = Hotelling_T2_Test(brain2); 
             stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+
+            if ~isempty(confounds)
+                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
+                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+            end
             
             % d=t --> same result as from a direct estimate of d (sample):
             % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
@@ -659,7 +675,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % 1. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
-            % 2. Optional: regress confounds from brain and score
+            % 2. If confounds: regress confounds from brain and score
             if isempty(confounds)
                 brain2=brain_reduced;
                 score2=score;
@@ -669,13 +685,31 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
                 brain2 = brain_reduced - P_confound * brain_reduced;
                 score2 = score - P_confound * score;
-                
             end
 
             % 3. Canonical Correlation (top component)
             [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain2,score2);
             p = stats.pChisq; % TODO: compare with look up from Winkler et al table
-            %d = 2*r/sqrt(1-r^2); % TODO: confirm
+
+            % If confounds: repeat Canonical Correlation with semipartial analogue
+            if ~isempty(confounds)
+                
+                stat_removeconf = stat;
+                p_removeconf = p;
+
+                switch test_type
+                case 'multi_t2'
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
+                case 'multi_r'
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain2,score);
+                end
+                p = stats.pChisq; % TODO: compare with look up from Winkler et al table
+            end
+
+            % If t-test: convert to t-stat
+            if strcmp(test_type,'multi_t2')
+                stat = r_to_t(stat);
+            end
 
 
     end
