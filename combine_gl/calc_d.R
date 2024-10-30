@@ -40,13 +40,20 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
           # TODO: confirm that orig_stat_type for t2 is always 't2', not 'r' for all studies
           d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
           ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
-        },
+          # r_sq is stat squared since stat is r
+          r_sq <- stat^2
+          },
         
         "t2" = {
           d <- stat * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
           # TODO: catch this error earlier, maybe in checker:
           if (!is.null(d_maps[[i]][[t]]$n1[1])) {
           ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
+          # to get r_sq, first convert t2 (stat) to r, then square it
+          # conversion from t2 to r from matlab script effect_size_reference.m (no confounds)
+          # changed n to n1+n2, removed n_confounds
+          r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
+          r_sq = r^2
           }
         },
         
