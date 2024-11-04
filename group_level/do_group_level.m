@@ -604,11 +604,11 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
-            [stat,p] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
+            [stat,p,B] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
             
             if ~isempty(confounds)
-                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                %[stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
+                y_res_plus_intercept = y - [ones(n,1), z] * B + B(1);
+                [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_res_plus_intercept, 1);
             end
 
         case 't2'
@@ -653,16 +653,12 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
 
             if ~isempty(confounds)
-                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                %[stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
+                stat_removeconf = stat;
+                p_removeconf = p;
+                stat = [];
+                p = [];
             end
             
-            % d=t --> same result as from a direct estimate of d (sample):
-            % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
-            % and same p as from manova1:
-            % [~, p, ~] = manova1(brain2, ones(size(brain2, 1), 1));
-
-
 
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
@@ -692,6 +688,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 stat_removeconf = stat;
                 p_removeconf = p;
 
+                % relative to total variance in y, without regression (akin to semipartial r)
                 switch test_type
                 case 'multi_t2'
                     [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
