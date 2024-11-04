@@ -604,23 +604,18 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
-            [stat,p] = Regression_fast_mass_univ_y([ones(n,1), confounds], brain);
-            
-            stat = stat(1,:);
-            p = p(1,:);
+            [stat,p] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
             
             if ~isempty(confounds)
                 %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+                %[stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
             end
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
-                [stat,p] = Regression_fast_mass_univ_y([ones(n,1), score], brain);
-                stat = stat(2,:);
-                p = p(2,:);
+                [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
             else
                 [~, stat_removeconf, p_removeconf, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
             end
@@ -659,7 +654,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
 
             if ~isempty(confounds)
                 %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+                %[stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
             end
             
             % d=t --> same result as from a direct estimate of d (sample):
