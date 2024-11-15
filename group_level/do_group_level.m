@@ -759,7 +759,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 if ~isempty(confounds)
                     % use conversion from partial_and_semipartial_corr.m function
                     stat = r_to_test_stats(stat, n, 1, 2);
-                    stat_remove_conf = r_to_test_stats(stat_remove_conf, n, 1, 2);
+                    stat_removeconf = r_to_test_stats(stat_removeconf, n, 1, 2);
                 else
                     stat = r_to_test_stats(stat, n, 0, 2);
                 end
