@@ -6,8 +6,8 @@ function [r_part, t_part, p_part, r_semipart, t_semipart, p_semipart] = partial_
     r_yz = r_pairwise{1,3};
     r_xz = r_pairwise{2,3};
 
-    r_part = r_partial_from_pairwise(r_yx, r_yz, r_xz);
-    r_semipart = r_semipartial_from_pairwise(r_yx, r_yz, r_xz);
+    r_part = r_partial_from_pairwise(r_yx(:), r_yz(:), r_xz(:));
+    r_semipart = r_semipartial_from_pairwise(r_yx(:), r_yz(:), r_xz(:));
 
     [t_part, p_part] = r_to_test_stats(r_part, n, 1, 2);
     [t_semipart, p_semipart] = r_to_test_stats(r_semipart, n, 1, 2);
