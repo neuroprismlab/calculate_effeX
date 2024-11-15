@@ -673,21 +673,21 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
 
         case 'multi_t'
             %  Hotelling t-Test (Multivariate): brain is outcome
-            
-            % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
-
-            % 2. If confounds: regress confounds from brain
+           
+            % 1. If confounds: regress confounds from brain
             if isempty(confounds)
-                brain2 = brain_reduced;
+                brain2 = brain;
             else
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
-                brain2 = brain_reduced - P_confound * brain_reduced;
+                brain2 = brain - P_confound * brain;
             end
-
+ 
+            % 2. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
+            
             % 3. Hotelling t-test 
-            [t_sq,p] = Hotelling_T2_Test(brain2); 
+            [t_sq,p] = Hotelling_T2_Test(brain_reduced); 
             stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
 
             if ~isempty(confounds)
@@ -717,23 +717,24 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
-            % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
-
-            % 2. If confounds: regress confounds from brain and score
+            % 1. If confounds: regress confounds from brain and score
             if isempty(confounds)
-                brain2=brain_reduced;
+                brain2=brain;
                 score2=score;
             else
                 confounds = confounds(complete_cases,:); % filter for only complete cases
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
-                brain2 = brain_reduced - P_confound * brain_reduced;
+                brain2 = brain - P_confound * brain;
                 score2 = score - P_confound * score;
             end
+            
+            % 2. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
 
+            
             % 3. Canonical Correlation (top component)
-            [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain2,score2);
+            [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
             p = stats.pChisq; % TODO: compare with look up from Winkler et al table
 
             % If confounds: repeat Canonical Correlation with semipartial analogue
@@ -748,16 +749,24 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 % relative to total variance in y, without regression (akin to semipartial r)
                 switch test_type
                 case 'multi_t2'
-                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
+                    [~,brain_reduced_w_confound] = pca(brain, 'NumComponents', n_components); 
+                    % stat_full_y is the correlation obtained without regressing confounds from y
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced_w_confound,score2);
                 case 'multi_r'
-                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain2,score);
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score);
                 end
-                p = stats.pChisq; % TODO: compare with look up from Winkler et al table
+                %p = stats.pChisq;
             end
 
             % If t-test: convert to t-stat
             if strcmp(test_type,'multi_t2')
-                stat = r_to_t(stat, n, 0);
+                if ~isempty(confounds)
+                    % use conversion from partial_and_semipartial_corr.m function
+                    stat = r_to_test_stats(stat, n, 1, 2);
+                    stat_remove_conf = r_to_test_stats(stat_remove_conf, n, 1, 2);
+                else
+                    stat = r_to_test_stats(stat, n, 0, 2);
+                end
             end
 
 
