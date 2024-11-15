@@ -102,7 +102,7 @@ addpath(genpath(reference_dir));
 % setup for tests
 
 if testing
-    datasets = datasets(7);
+    datasets = datasets(4);
     %pooling_params = [1];
     testing_str = 'test';
 else
@@ -624,10 +624,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             stat_removeconf = [];
             p_removeconf = [];
            
-            
-            stat = stat(1,:);
-            p = p(1,:);
-            
             if ~isempty(confounds)
                 y_res_plus_intercept = y - [ones(n,1), z] * B + B(1);
                 [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_res_plus_intercept, 1);
@@ -642,8 +638,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             
             if isempty(confounds)
                 [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
-                stat = stat(2,:);
-                p = p(2,:);
                 
                 % TMP: ask Steph if this is okay. Needed to have something
                 % assigned so that I can have the function output these
