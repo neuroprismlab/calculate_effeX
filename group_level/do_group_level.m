@@ -378,12 +378,14 @@ for i = 1:length(datasets)
 
         for do_multivariate = multivariate_params
             if do_multivariate
-                        test_type=['multi_',test_type];
-                        % TODO: consider whether safe to overwrite
-                        mv_test_type = test_type;
+                test_type=['multi_',test_type];
+                % TODO: consider whether safe to overwrite
+                mv_test_type = test_type;
             else
                 mv_test_type = 'none';
             end
+            disp(['   > statistical test = ', test_type])
+
             
             for do_pooling = pooling_params
 
@@ -434,14 +436,14 @@ for i = 1:length(datasets)
                     pooling_method = 'none';
                 end
 
-                disp(['   > pooling = ', pooling_method])
+                disp(['     > pooling = ', pooling_method])
 
                 for motion_method_it = 1:length(motion_method_params)
 
                     %% Account/correct for motion as specified
 
                     motion_method = motion_method_params{motion_method_it};
-                    disp(['     > motion method = ', motion_method])
+                    disp(['       > motion method = ', motion_method])
 
                     score2 = score; % changes if applying motion threshold
 
