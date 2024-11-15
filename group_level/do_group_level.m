@@ -77,6 +77,7 @@ data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/helper_scripts/'];
+reference_dir = [current_dir, '/reference/'];
 
 % params
 
@@ -96,6 +97,7 @@ datasets = {filenames.name};
 
 % set paths
 addpath(genpath(scripts_dir));
+addpath(genpath(reference_dir));
 
 % setup for tests
 
@@ -473,7 +475,7 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                        [stat,p,n,n1,n2,std_brain,std_score, stat_removeconf, p_removeconf] = run_test(test_type,m2,score2,motion);
                     else
                         [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
@@ -491,6 +493,14 @@ for i = 1:length(datasets)
                     results.data.(result_name).pooling_method = pooling_method;
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
+                    
+                    %TODO: make this more rigorous than just exist()
+                    if exist("stat_removeconf")
+                        results.data.(result_name).stat_removeconf = stat_removeconf;
+                    end
+                    if exist("p_removeconf")
+                        results.data.(result_name).p_removeconf = p_removeconf;
+                    end
                     
                     % skeleton for adding other results once incorporated
                     % TODO: test this when incorporating
@@ -531,7 +541,7 @@ end % datasets
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 % TODO: this is also the standard analogue to partial corr estimates, as validated by our effect_size_ref_validation. Revisit.
 
-function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
+function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -606,18 +616,43 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
            
             [stat,p,B] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
             
+            % TMP: ask Steph if this is okay. Needed to have something
+            % assigned so that I can have the function output these
+            % variables
+            stat_removeconf = [];
+            p_removeconf = [];
+           
+            
+            stat = stat(1,:);
+            p = p(1,:);
+            
             if ~isempty(confounds)
                 y_res_plus_intercept = y - [ones(n,1), z] * B + B(1);
                 [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_res_plus_intercept, 1);
+                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
             end
+            
+            varargout{1} = stat_removeconf;
+            varargout{2} = p_removeconf;
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
                 [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
+                stat = stat(2,:);
+                p = p(2,:);
+                
+                % TMP: ask Steph if this is okay. Needed to have something
+                % assigned so that I can have the function output these
+                % variables
+%                 stat_removeconf = [];
+%                 p_removeconf = [];
             else
                 [~, stat_removeconf, p_removeconf, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
+                % testing:
+                varargout{1} = stat_removeconf;
+                varargout{2} = p_removeconf;
             end
      
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
@@ -630,6 +665,9 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 [stat,p]=corr(score,brain);
             else
                 [stat_removeconf, ~, p_removeconf, stat, ~, p] = partial_and_semipartial_corr(score, brain, confounds, n);
+                % testing:
+                varargout{1} = stat_removeconf;
+                varargout{2} = p_removeconf;
             end
 
 
@@ -657,8 +695,24 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 p_removeconf = p;
                 stat = [];
                 p = [];
+                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
+                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
             end
             
+            % d=t --> same result as from a direct estimate of d (sample):
+            % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
+            % and same p as from manova1:
+            % [~, p, ~] = manova1(brain2, ones(size(brain2, 1), 1));
+
+            % TMP: ask Steph if this is okay. Needed to have something
+            % assigned so that I can have the function output these
+            % variables
+            stat_removeconf = [];
+            p_removeconf = [];
+            
+            varargout{1} = stat_removeconf;
+            varargout{2} = p_removeconf;
+
 
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
@@ -687,6 +741,9 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
                 
                 stat_removeconf = stat;
                 p_removeconf = p;
+                
+                varargout{1} = stat_removeconf;
+                varargout{2} = p_removeconf;
 
                 % relative to total variance in y, without regression (akin to semipartial r)
                 switch test_type
@@ -700,7 +757,7 @@ function [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,c
 
             % If t-test: convert to t-stat
             if strcmp(test_type,'multi_t2')
-                stat = r_to_t(stat);
+                stat = r_to_t(stat, n, 0);
             end
 
 
