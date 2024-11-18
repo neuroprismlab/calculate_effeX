@@ -73,7 +73,7 @@
 % script and data directories
 
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
-data_dir = '/work/neuroprism/effect_size/data/subject_level/before_organized/'; % USER-DEFINED
+data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/helper_scripts/'];
@@ -555,7 +555,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
     end
 
     % Remove incomplete cases
-    if contains(test_type, 'r') || strcmp(test_type, 't2')
+    if contains(test_type, 'r') || contains(test_type, 't2')
         if isempty(confounds)
             complete_cases = all(~isnan(brain), 2) & all(~isnan(score), 2);
             brain = brain(complete_cases,:);
