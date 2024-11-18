@@ -133,9 +133,41 @@ function [data1, data2, varargout] = remove_missing_subs(data1, data2, S, test_t
         [~, brain_idx] = ismember(subids_intersect_all, brain_subids);
         [~, group_idx] = ismember(subids_intersect_all, group_subids);
         [~, motion_idx] = ismember(subids_intersect_all, motion_subids);
-        data1 = brain_data(brain_idx,:);
-        data2 = group_data(group_idx);
+        brain_data = brain_data(brain_idx,:);
+        group_data = group_data(group_idx);
         motion = motion(motion_idx);
+        
+        % SPECIAL - check for duplicate subjects in subids_intersect_all and assign to one of two groups
+        [unique_subids, ~, unique_idx] = unique(subids_intersect_all, 'stable');
+        duplicate_subids = unique_subids(histc(unique_idx, 1:numel(unique_subids)) > 1);
+
+        if ~isempty(duplicate_subids)
+            
+            unique_groups = unique(group_data);
+            
+            % permute and assign half to group 1 and half to group 2 based on original group assignments
+            for i = 1:length(duplicate_subids)
+                dup_idx = find(subids_intersect_all == duplicate_subids(i));
+                permuted_idx = dup_idx(randperm(length(dup_idx)));
+                half = floor(length(permuted_idx) / 2);
+
+                % assign subjects to original groups
+                group1_idx = group_data(permuted_idx(1:half)) == unique_groups(1);
+                group2_idx = group_data(permuted_idx(half+1:end)) == unique_groups(2);
+
+                % filter out subjects that are not in their assigned group
+                brain_data(permuted_idx(~group1_idx), :) = [];
+                group_data(permuted_idx(~group1_idx)) = [];
+                motion(permuted_idx(~group1_idx), :) = [];
+
+                brain_data(permuted_idx(~group2_idx), :) = [];
+                group_data(permuted_idx(~group2_idx)) = [];
+                motion(permuted_idx(~group2_idx), :) = [];
+            end
+        end
+
+        data1 = brain_data;
+        data2 = group_data;
         
         varargout{1} = motion;
 

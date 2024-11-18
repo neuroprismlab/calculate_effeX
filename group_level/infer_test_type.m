@@ -23,12 +23,21 @@ function test_type = infer_test_type(S, test)
         sub_ids_cond1 = S.outcome.(test).sub_ids(S.outcome.(test).score==unique_conditions(1));
         sub_ids_cond2 = S.outcome.(test).sub_ids(S.outcome.(test).score==unique_conditions(2));
         
-        if all(ismember(sub_ids_cond1, sub_ids_cond2)) && all(ismember(sub_ids_cond2, sub_ids_cond1))
+        n_subs_duplicated = length(intersect(sub_ids_cond1, sub_ids_cond2));
+        n_subs_without_duplicate =  length(sub_ids_cond1) + length(sub_ids_cond2) - (2 * n_subs_duplicated); % remove duplicates from both groups
+
+        if n_subs_without_duplicate == 0
             test_type = 't';
-        elseif isempty(intersect(sub_ids_cond1, sub_ids_cond2))
+        elseif n_subs_duplicated == 0 
             test_type = 't2';
         else
-            error('Some subjects are duplicated and some are not. Remove all duplicates to run a 2-sample t-test, or remove all non-duplicates to run a paired-sample t-test.')
+            warning('Some subjects are duplicated and some are not. Selecting paired or 2-sample t-test based on which group size would be larger and will remove some subjects accordingly (i.e., remove all duplicates to run a 2-sample t-test, or remove all non-duplicates to run a paired-sample t-test.)')
+            if n_subs_duplicated >= ((n_subs_duplicated + n_subs_without_duplicate) / 2) % compare group sizes - for t2, would assign the duplicated subjects to one of two groups
+                test_type = 't';
+            else
+                test_type = 't2';
+            end
+            
         end
             
     elseif iscell(S.outcome.(test).contrast)
@@ -45,15 +54,24 @@ function test_type = infer_test_type(S, test)
             elseif length(S.outcome.(test).contrast)==2
                 % if two conditions -> t (paired) or t2
 
-               sub_ids_cond1 = S.brain_data.(S.outcome.(test).contrast{1}).sub_ids;
-               sub_ids_cond2 = S.brain_data.(S.outcome.(test).contrast{2}).sub_ids;
+                sub_ids_cond1 = S.brain_data.(S.outcome.(test).contrast{1}).sub_ids;
+                sub_ids_cond2 = S.brain_data.(S.outcome.(test).contrast{2}).sub_ids;
                 
-                if all(ismember(sub_ids_cond1, sub_ids_cond2)) && all(ismember(sub_ids_cond2, sub_ids_cond1))
+                n_subs_duplicated = length(intersect(sub_ids_cond1, sub_ids_cond2));
+                n_subs_without_duplicate =  length(sub_ids_cond1) + length(sub_ids_cond2) - (2 * n_subs_duplicated); % remove duplicates from both groups
+        
+                if n_subs_without_duplicate == 0
                     test_type = 't';
-                elseif isempty(intersect(sub_ids_cond1, sub_ids_cond2))
+                elseif n_subs_duplicated == 0 
                     test_type = 't2';
                 else
-                    error('Some subjects are duplicated and some are not. Remove all duplicates to run a 2-sample t-test, or remove all non-duplicates to run a paired-sample t-test.')
+                    warning('Some subjects are duplicated and some are not. Selecting paired or 2-sample t-test based on which group size would be larger and will remove some subjects accordingly (i.e., remove all duplicates to run a 2-sample t-test, or remove all non-duplicates to run a paired-sample t-test.)')
+                    if n_subs_duplicated >= ((n_subs_duplicated + n_subs_without_duplicate) / 2) % compare group sizes - for t2, would assign the duplicated subjects to one of two groups
+                        test_type = 't';
+                    else
+                        test_type = 't2';
+                    end
+                        
                 end
             
             else 
