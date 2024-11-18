@@ -86,6 +86,7 @@ low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
 multivariate_params = [0, 1];
+save_info.overwrite = 1; % initialized
 save_info.use_same = 0;
 save_info.asked = 0;
 testing=1; % USER-DEFINED
@@ -137,7 +138,6 @@ for i = 1:length(datasets)
 
     S = load(data_path,'study_info');
     results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map}, '_'),'*'];
-    save_info.overwrite = 1;
     
     if ~isempty(dir(results_file_pre_prefix))
         if ~save_info.asked || ~save_info.use_same
