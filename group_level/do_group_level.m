@@ -625,8 +625,8 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             p_removeconf = [];
            
             if ~isempty(confounds)
-                y_res_plus_intercept = y - [ones(n,1), z] * B + B(1);
-                [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_res_plus_intercept, 1);
+                brain_res_plus_intercept = brain - [ones(n,1), confounds] * B + B(1);
+                [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), brain_res_plus_intercept, 1);
                 %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
             end
             
