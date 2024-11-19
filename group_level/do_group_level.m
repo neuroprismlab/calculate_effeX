@@ -89,7 +89,7 @@ multivariate_params = [0, 1];
 save_info.overwrite = 1; % initialized
 save_info.use_same = 0;
 save_info.asked = 0;
-testing=1; % USER-DEFINED
+testing=0; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -477,7 +477,7 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [stat,p,n,n1,n2,std_brain,std_score, stat_removeconf, p_removeconf] = run_test(test_type,m2,score2,motion);
+                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2,score2,motion);
                     else
                         [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
@@ -496,22 +496,11 @@ for i = 1:length(datasets)
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
                     
-                    %TODO: make this more rigorous than just exist()
-                    if exist("stat_removeconf")
-                        results.data.(result_name).stat_removeconf = stat_removeconf;
-                    end
-                    if exist("p_removeconf")
-                        results.data.(result_name).p_removeconf = p_removeconf;
+                    if strcmp(motion_method,'regression')
+                        results.data.(result_name).stat_fullres = stat_fullres;
+                        results.data.(result_name).p_fullres = p_fullres;
                     end
                     
-                    % skeleton for adding other results once incorporated
-                    % TODO: test this when incorporating
-%                     if strcmp(test_type, 't2') || strcmp(test_type, 'r')
-%                         results.data.(result_name).r_sq_full = r_sq_full;
-%                     elseif strcmp(test_type, 'multi_t')
-%                         results.data.(result_name).omega_sq = omega_sq;
-%                     end
-                        
                         
 
                 end % motion
@@ -607,7 +596,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
 
     % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
     % Note: when dealing with confounds, "stat/p" is an estimate of the statistic in a multiple regression framework
-    %       and stat_removeconf / p_removeconf is an estimate of the statistic in the case of zero confounds
+    %       and stat_fullres / p_fullres is an estimate of the statistic in the case of zero confounds
     
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
@@ -618,37 +607,22 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
            
             [stat,p,B] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
             
-            % TMP: ask Steph if this is okay. Needed to have something
-            % assigned so that I can have the function output these
-            % variables
-            stat_removeconf = [];
-            p_removeconf = [];
-           
             if ~isempty(confounds)
                 brain_res_plus_intercept = brain - [ones(n,1), confounds] * B + B(1);
-                [stat_removeconf, p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), brain_res_plus_intercept, 1);
-                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+                [stat_fullres, p_fullres] = Regression_faster_mass_univ_y(ones(n,1), brain_res_plus_intercept, 1);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
-            
-            varargout{1} = stat_removeconf;
-            varargout{2} = p_removeconf;
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
                 [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
-                
-                % TMP: ask Steph if this is okay. Needed to have something
-                % assigned so that I can have the function output these
-                % variables
-%                 stat_removeconf = [];
-%                 p_removeconf = [];
             else
-                [~, stat_removeconf, p_removeconf, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
-                % testing:
-                varargout{1} = stat_removeconf;
-                varargout{2} = p_removeconf;
+                [~, stat_fullres, p_fullres, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
      
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
@@ -660,10 +634,9 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             if isempty(confounds)
                 [stat,p]=corr(score,brain);
             else
-                [stat_removeconf, ~, p_removeconf, stat, ~, p] = partial_and_semipartial_corr(score, brain, confounds, n);
-                % testing:
-                varargout{1} = stat_removeconf;
-                varargout{2} = p_removeconf;
+                [stat_fullres, ~, p_fullres, stat, ~, p] = partial_and_semipartial_corr(score, brain, confounds, n);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
 
 
@@ -687,28 +660,14 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
 
             if ~isempty(confounds)
-                stat_removeconf = stat;
-                p_removeconf = p;
+                stat_fullres = stat;
+                p_fullres = p;
                 stat = [];
                 p = [];
-                %y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                %[stat_removeconf, p_removeconf] = Regression_fast_mass_univ_y__faster(ones(n,1), y_residuals_with_intercept);
+
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
-            
-            % d=t --> same result as from a direct estimate of d (sample):
-            % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
-            % and same p as from manova1:
-            % [~, p, ~] = manova1(brain2, ones(size(brain2, 1), 1));
-
-            % TMP: ask Steph if this is okay. Needed to have something
-            % assigned so that I can have the function output these
-            % variables
-            stat_removeconf = [];
-            p_removeconf = [];
-            
-            varargout{1} = stat_removeconf;
-            varargout{2} = p_removeconf;
-
 
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
@@ -736,11 +695,11 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             % If confounds: repeat Canonical Correlation with semipartial analogue
             if ~isempty(confounds)
                 
-                stat_removeconf = stat;
-                p_removeconf = p;
+                stat_fullres = stat;
+                p_fullres = p;
                 
-                varargout{1} = stat_removeconf;
-                varargout{2} = p_removeconf;
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
 
                 % relative to total variance in y, without regression (akin to semipartial r)
                 switch test_type
@@ -759,7 +718,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 if ~isempty(confounds)
                     % use conversion from partial_and_semipartial_corr.m function
                     stat = r_to_test_stats(stat, n, 1, 2);
-                    stat_removeconf = r_to_test_stats(stat_removeconf, n, 1, 2);
+                    varargout{1} = r_to_test_stats(stat_fullres, n, 1, 2);
                 else
                     stat = r_to_test_stats(stat, n, 0, 2);
                 end
