@@ -13,18 +13,54 @@ checker <- function(d_maps, output_file = 'checked_d_maps') {
       d <- d_maps[[i]][[t]]$d
       sim_ci_lb <- d_maps[[i]][[t]]$sim_ci_lb
       sim_ci_ub <- d_maps[[i]][[t]]$sim_ci_ub
-      
-      if (dim(d)[1] > 1) {
-        d_maps[[i]][[t]]$d <- t(d)
+      if (grepl("motion.regression", t)) {
+        d.fullres <- d_maps[[i]][[t]]$d.fullres
+        sim_ci_lb.fullres <- d_maps[[i]][[t]]$sim_ci_lb.fullres
+        sim_ci_ub.fullres <- d_maps[[i]][[t]]$sim_ci_ub.fullres
       }
       
-      if (length(sim_ci_lb)[1] > 1) {
-        d_maps[[i]][[t]]$sim_ci_lb <- t(sim_ci_lb)
+      # TODO: figure out what's wrong with multi_t then remove this logic
+      if (grepl("mv.multi.t", t)) {
+        d_maps[[i]][[t]]$d <- NaN
+        d_maps[[i]][[t]]$sim_ci_lb <- NaN
+        d_maps[[i]][[t]]$sim_ci_ub <- NaN
+      } else {
+        if (dim(d)[1] > 1) {
+          d_maps[[i]][[t]]$d <- t(d)
+        }
+        
+        if (length(sim_ci_lb)[1] > 1) {
+          d_maps[[i]][[t]]$sim_ci_lb <- t(sim_ci_lb)
+        }
+        
+        if (length(sim_ci_ub)[1] > 1) {
+          d_maps[[i]][[t]]$sim_ci_ub <- t(sim_ci_ub)
+        }
       }
       
-      if (length(sim_ci_ub)[1] > 1) {
-        d_maps[[i]][[t]]$sim_ci_ub <- t(sim_ci_ub)
+      # repeat for regression case -  # TODO: could also simplify + combine w above
+      if (grepl("motion.regression", t)) {
+        
+        # TODO: figure out what's wrong with multi_t then remove this logic
+        if (grepl("mv.multi.t", t)) {
+          d_maps[[i]][[t]]$d.fullres <- NaN
+          d_maps[[i]][[t]]$sim_ci_lb.fullres <- NaN
+          d_maps[[i]][[t]]$sim_ci_ub.fullres <- NaN
+        } else {
+          if (dim(d.fullres)[1] > 1) {
+            d_maps[[i]][[t]]$d.fullres <- t(d.fullres)
+          }
+          
+          if (length(sim_ci_lb.fullres)[1] > 1) {
+            d_maps[[i]][[t]]$sim_ci_lb.fullres <- t(sim_ci_lb.fullres)
+          }
+          
+          if (length(sim_ci_ub.fullres)[1] > 1) {
+            d_maps[[i]][[t]]$sim_ci_ub.fullres <- t(sim_ci_ub.fullres)
+          }
+        }
       }
+      
     }}
   
   save(d_maps, file = output_path)
