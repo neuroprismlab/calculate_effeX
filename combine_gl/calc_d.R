@@ -28,6 +28,7 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
 
     for (t in names(d_maps[[i]])) { # unique tests within studies (e.g., w/w-o motion correction)
 
+      print(t)
       stat <- d_maps[[i]][[t]]$stat
       # b_std <- as.numeric(b_std) # TODO: catch this earlier in checker, don't convert
       alpha_corrected <- alpha / length(stat)
@@ -69,11 +70,18 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
       )
 
       # append to results
-
+      
       d_maps[[i]][[t]]$d <- d
-      d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
-      d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
-
+      
+      # TMP: if ci has length 0, just put ci as 0 so code will run
+      if (length(ci) == 0) {
+        d_maps[[i]][[t]]$sim_ci_lb <- 0
+        d_maps[[i]][[t]]$sim_ci_ub <- 0
+      }
+      else {
+        d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
+        d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
+      }
     }
   }
   

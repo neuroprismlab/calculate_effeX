@@ -61,6 +61,8 @@ clean_data <- function(data_dir = data_dir,
       test_component_2 <- study_info$test.components[[2]][[1]]
     }
     
+    # TODO: make sure test component 2 is the task for activation studies, currently component 2 is rest
+    
     name = sub("\\.mat$", "", file)
     
     ref = ifelse(study_info$map == "act", "voxel", ifelse(study_info$dataset == "ukb", "ukb_55", "shen_268"))
