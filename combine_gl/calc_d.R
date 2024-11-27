@@ -35,53 +35,48 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
       
       # calculate d and simultaneous confidence intervals
       
-      switch(study$orig_stat_type[[i]],
+      result <- calculate_effect_size(stat, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
+      d <- result$d
+      ci <- result$ci
+      r_sq <- result$r_sq
+      
+      # we have two versions of motion regression
+      
+      if (d_maps[[i]][[t]]$motion.method == "regression") {
         
-        "r" = {
-          # TODO: confirm that orig_stat_type for t2 is always 't2', not 'r' for all studies
-          d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
-          ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
-          # r_sq is stat squared since stat is r
-          r_sq <- stat^2
-          },
+        stat.fullres <- d_maps[[i]][[t]]$stat.fullres
+        result.fullres <- calculate_effect_size(stat.fullres, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
+        d.fullres <- result.fullres$d
+        ci.fullres <- result.fullres$ci
+        r_sq.fullres <- result.fullres$r_sq
         
-        "t2" = {
-          d <- stat * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1]);
-          # TODO: catch this error earlier, maybe in checker:
-          if (!is.null(d_maps[[i]][[t]]$n1[1])) {
-          ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
-          # to get r_sq, first convert t2 (stat) to r, then square it
-          # conversion from t2 to r from matlab script effect_size_reference.m (no confounds)
-          # changed n to n1+n2, removed n_confounds
-          r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
-          r_sq = r^2
-          }
-        },
-        
-        "t" = {
-          d <- stat / sqrt(d_maps[[i]][[t]]$n[1]);
-          ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
-        },
-
-        {
-          stop("Effect size conversion not set up for other stats than r, t, t2.")
+        if (d_maps[[i]][[t]]$mv.method == "multi_t") { # we do not calculate multiple regression analog of multi_t so will be empty
+          d <- NaN
+          ci <- matrix(c(NaN, NaN), ncol = 1)
+          r_sq <- NaN
+          
+          # TODO: debug why we're not getting results then remove this
+          d.fullres <- NaN
+          ci.fullres <- matrix(c(NaN, NaN), ncol = 1)
+          r_sq.fullres <- NaN
         }
-
-      )
+        
+      }
 
       # append to results
       
       d_maps[[i]][[t]]$d <- d
       
-      # TMP: if ci has length 0, just put ci as 0 so code will run
-      if (length(ci) == 0) {
-        d_maps[[i]][[t]]$sim_ci_lb <- 0
-        d_maps[[i]][[t]]$sim_ci_ub <- 0
+      
+      d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
+      d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
+      
+      if (d_maps[[i]][[t]]$motion.method == "regression") {
+        d_maps[[i]][[t]]$d.fullres <- d.fullres
+        d_maps[[i]][[t]]$sim_ci_lb.fullres <- ci.fullres[1,]
+        d_maps[[i]][[t]]$sim_ci_ub.fullres <- ci.fullres[2,]
       }
-      else {
-        d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
-        d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
-      }
+
     }
   }
   
@@ -126,4 +121,33 @@ d_ci__from_r <- function(r, n, num_sdx_r2d, alpha = 0.05) {
     return(list(lower_bound, upper_bound))
 }
 
+calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, alpha_corrected) {
+  d <- NULL
+  ci <- NULL
+  r_sq <- NULL
+  
+  switch(stat_type,
+         "r" = {
+           d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
+           ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
+           r_sq <- stat^2
+         },
+         
+         "t2" = {
+           d <- stat * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1])
+           if (!is.null(d_maps[[i]][[t]]$n1[1])) {
+             ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
+             r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
+             r_sq <- r^2
+           }
+         },
+         
+         "t" = {
+           d <- stat / sqrt(d_maps[[i]][[t]]$n[1])
+           ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+         }
+  )
+  
+  return(list(d = d, ci = ci, r_sq = r_sq))
+}
 
