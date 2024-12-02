@@ -50,24 +50,11 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
         ci.fullres <- result.fullres$ci
         r_sq.fullres <- result.fullres$r_sq
         
-        if (d_maps[[i]][[t]]$mv.method == "multi_t") { # we do not calculate multiple regression analog of multi_t so will be empty
-          d <- NaN
-          ci <- matrix(c(NaN, NaN), ncol = 1)
-          r_sq <- NaN
-          
-          # TODO: debug why we're not getting results then remove this
-          d.fullres <- NaN
-          ci.fullres <- matrix(c(NaN, NaN), ncol = 1)
-          r_sq.fullres <- NaN
-        }
-        
       }
 
       # append to results
       
       d_maps[[i]][[t]]$d <- d
-      
-      
       d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
       d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
       
@@ -147,6 +134,16 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
            ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
          }
   )
+  
+  
+  # quick cleanup - convert empty results to NaN (e.g., we do not calculate multiple regression analog of multi_t so will be empty)
+  if (length(d)==0) {
+    d <- NaN
+    ci <- matrix(c(NaN, NaN), ncol = 1)
+    if (exists("r_sq")) {
+      r_sq <- NaN
+    }
+  }
   
   return(list(d = d, ci = ci, r_sq = r_sq))
 }
