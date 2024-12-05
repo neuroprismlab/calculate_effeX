@@ -57,11 +57,13 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
       d_maps[[i]][[t]]$d <- d
       d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
       d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
+      d_maps[[i]][[t]]$r_sq <- r_sq
       
       if (d_maps[[i]][[t]]$motion.method == "regression") {
         d_maps[[i]][[t]]$d.fullres <- d.fullres
         d_maps[[i]][[t]]$sim_ci_lb.fullres <- ci.fullres[1,]
         d_maps[[i]][[t]]$sim_ci_ub.fullres <- ci.fullres[2,]
+        d_maps[[i]][[t]]$r_sq.fullres <- r_sq.fullres
       }
 
     }
