@@ -24,13 +24,14 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
 
     effect_name <- names(d_maps)[i]
     study_idx <- which(study$name == effect_name)
-    print(effect_name)
+    
+    cat('study:', effect_name, '\n')
 
     for (t in names(d_maps[[i]])) { # unique tests within studies (e.g., w/w-o motion correction)
 
-      print(t)
+      cat('   test:', t, '\n')
+      
       stat <- d_maps[[i]][[t]]$stat
-      # b_std <- as.numeric(b_std) # TODO: catch this earlier in checker, don't convert
       alpha_corrected <- alpha / length(stat)
       
       # calculate d and simultaneous confidence intervals
@@ -111,10 +112,7 @@ d_ci__from_r <- function(r, n, num_sdx_r2d, alpha = 0.05) {
 }
 
 calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, alpha_corrected) {
-  d <- NULL
-  ci <- NULL
-  r_sq <- NULL
-  
+    
   switch(stat_type,
          "r" = {
            d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
