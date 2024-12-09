@@ -134,17 +134,16 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
          "t" = {
            d <- stat / sqrt(d_maps[[i]][[t]]$n[1])
            ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+           r_sq <- matrix(NaN)
          }
   )
   
   
   # quick cleanup - convert empty results to NaN (e.g., we do not calculate multiple regression analog of multi_t so will be empty)
   if (length(d)==0) {
-    d <- NaN
+    d <- matrix(NaN)
     ci <- matrix(c(NaN, NaN), ncol = 1)
-    if (exists("r_sq")) {
-      r_sq <- NaN
-    }
+    r_sq <- matrix(NaN)
   }
   
   return(list(d = d, ci = ci, r_sq = r_sq))
