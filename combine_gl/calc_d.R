@@ -34,37 +34,32 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
       stat <- d_maps[[i]][[t]]$stat
       alpha_corrected <- alpha / length(stat)
       
-      # calculate d and simultaneous confidence intervals
+      # calculate effect sizes & confidence intervals
       
       result <- calculate_effect_size(stat, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
-      d <- result$d
-      ci <- result$ci
-      r_sq <- result$r_sq
       
-      # we have two versions of motion regression
+      d_maps[[i]][[t]]$d <- result$d
+      d_maps[[i]][[t]]$sim_ci_lb <- result$ci[1,]
+      d_maps[[i]][[t]]$sim_ci_ub <- result$ci[2,]
+      d_maps[[i]][[t]]$r_sq <- result$r_sq
+      d_maps[[i]][[t]]$r_sq_sim_ci_lb <- result$r_sq_ci[1,]
+      d_maps[[i]][[t]]$r_sq_sim_ci_ub <- result$r_sq_ci[2,]
+ 
+      
+      # if motion regression, also calculate effects for full residualization case
       
       if (d_maps[[i]][[t]]$motion.method == "regression") {
-        
-        stat.fullres <- d_maps[[i]][[t]]$stat.fullres
-        result.fullres <- calculate_effect_size(stat.fullres, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
-        d.fullres <- result.fullres$d
-        ci.fullres <- result.fullres$ci
-        r_sq.fullres <- result.fullres$r_sq
-        
-      }
 
-      # append to results
-      
-      d_maps[[i]][[t]]$d <- d
-      d_maps[[i]][[t]]$sim_ci_lb <- ci[1,]
-      d_maps[[i]][[t]]$sim_ci_ub <- ci[2,]
-      d_maps[[i]][[t]]$r_sq <- r_sq
-      
-      if (d_maps[[i]][[t]]$motion.method == "regression") {
-        d_maps[[i]][[t]]$d.fullres <- d.fullres
-        d_maps[[i]][[t]]$sim_ci_lb.fullres <- ci.fullres[1,]
-        d_maps[[i]][[t]]$sim_ci_ub.fullres <- ci.fullres[2,]
-        d_maps[[i]][[t]]$r_sq.fullres <- r_sq.fullres
+          stat.fullres <- d_maps[[i]][[t]]$stat.fullres
+          result.fullres <- calculate_effect_size(stat.fullres, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
+
+          d_maps[[i]][[t]]$d <- result.fullres$d
+          d_maps[[i]][[t]]$sim_ci_lb <- result.fullres$ci[1,]
+          d_maps[[i]][[t]]$sim_ci_ub <- result.fullres$ci[2,]
+          d_maps[[i]][[t]]$r_sq <- result.fullres$r_sq
+          d_maps[[i]][[t]]$r_sq_sim_ci_lb <- result.fullres$r_sq_ci[1,]
+          d_maps[[i]][[t]]$r_sq_sim_ci_ub <- result.fullres$r_sq_ci[2,]
+ 
       }
 
     }
@@ -98,6 +93,25 @@ d_ci <- function(d, n1, n2 = NULL, alpha = 0.05) {
 }
 
 
+r_ci <- function(r, n, alpha = 0.05) {
+  
+  z_95 <- qnorm(1 - alpha) # e.g., 0.05 = 1.96
+  
+  lower_bound <- tanh(atanh(r) - z_95 / sqrt(n-3))
+  upper_bound <- tanh(atanh(r) + z_95 / sqrt(n-3))
+  
+  return(list(lower_bound, upper_bound))
+}
+
+#d_ci__from_r_ci <- function(r_ci_lower, r_ci_upper, num_sdx_r2d) {
+#
+#    lower_bound <- num_sdx_r2d * r_ci_lower / (1 - r_ci_lower ^ 2) ^ (1/2)
+#    upper_bound <- num_sdx_r2d * r_ci_upper / (1 - r_ci_upper ^ 2) ^ (1/2)
+#
+#    return(list(lower_bound, upper_bound))
+#}
+
+
 d_ci__from_r <- function(r, n, num_sdx_r2d, alpha = 0.05) {
 
     z_95 <- qnorm(1 - alpha) # e.g., 0.05 = 1.96
@@ -111,28 +125,39 @@ d_ci__from_r <- function(r, n, num_sdx_r2d, alpha = 0.05) {
     return(list(lower_bound, upper_bound))
 }
 
+
 calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, alpha_corrected) {
     
   switch(stat_type,
          "r" = {
            d <- num_sdx_r2d * stat / ((1 - stat^2) ^ (1/2))
            ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
+           
            r_sq <- stat^2
+           r_ci <- sapply(stat, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+           r_sq_ci <- r_ci^2
+
+
          },
          
          "t2" = {
            d <- stat * sqrt(1/d_maps[[i]][[t]]$n1[1] + 1/d_maps[[i]][[t]]$n2[1])
-           if (!is.null(d_maps[[i]][[t]]$n1[1])) {
+           if (!is.null(d_maps[[i]][[t]]$n1[1])) { # TODO: catch this issue elsewhere then remove
              ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n1[1], n2 = d_maps[[i]][[t]]$n2[1], alpha = alpha_corrected))
+             
              r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
              r_sq <- r^2
+             r_ci <- sapply(r, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+             r_sq_ci <- r_ci^2
            }
          },
          
          "t" = {
            d <- stat / sqrt(d_maps[[i]][[t]]$n[1])
            ci <- sapply(d, function(x) d_ci(x, n1 = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+           
            r_sq <- matrix(NaN)
+           r_sq_ci <- matrix(c(NaN, NaN), ncol = 1)
          }
   )
   
@@ -142,8 +167,9 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
     d <- matrix(NaN)
     ci <- matrix(c(NaN, NaN), ncol = 1)
     r_sq <- matrix(NaN)
+    r_sq_ci <- matrix(c(NaN, NaN), ncol = 1)
   }
   
-  return(list(d = d, ci = ci, r_sq = r_sq))
+  return(list(d = d, ci = ci, r_sq = r_sq, r_sq_ci = r_sq_ci))
 }
 
