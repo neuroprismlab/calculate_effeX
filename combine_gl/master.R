@@ -105,4 +105,4 @@ data <- checker(d_maps)
 
 # save the final results
 save(study, data, brain_masks, file = final_output_path)
-print(paste('Results saved in',final_output_path))
+cat(paste('Results saved in',final_output_path))
