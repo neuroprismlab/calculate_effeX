@@ -89,15 +89,15 @@ for stat_idx = 1:length(stat_list)
                     % 2. zero-confound logic: effect size represents
                     % using a variation on partial corr logic (pre-regress out of x and y) - instead, regress out of y (y_resid ~ intercept) - effect size from t-stat implicitly measures the decrease in SS with/without intercept
                     y_residuals_with_intercept = y - [ones(n,1), z] * B + B(1);
-                    [t_removeconf,p_removeconf] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
+                    [t_fullres,p_fullres] = Regression_faster_mass_univ_y(ones(n,1), y_residuals_with_intercept);
 
-                    stat2 = t_removeconf;
-                    p2 = p_removeconf;
+                    stat2 = t_fullres;
+                    p2 = p_fullres;
 
                     % TODO: validate
-                    d_removeconf = t1_to_d(t_removeconf,n);
+                    d_fullres = t1_to_d(t_fullres,n);
                     % d = B(1) / std(y_residuals); % TODO: move to validation
-                    omega_sq_removeconf = t1_to_omega_sq(t_removeconf,n,1); % TODO: check n_coefficients
+                    omega_sq_fullres = t1_to_omega_sq(t_fullres,n,1); % TODO: check n_coefficients
 
                 else
                     [t, p] = Regression_faster_mass_univ_y(ones(n,1), y);
