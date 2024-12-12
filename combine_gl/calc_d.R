@@ -135,7 +135,7 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
            
            r_sq <- stat^2
            r_ci <- sapply(stat, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
-           r_sq_ci <- r_ci^2
+           r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
 
 
          },
@@ -148,7 +148,7 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
              r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
              r_sq <- r^2
              r_ci <- sapply(r, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
-             r_sq_ci <- r_ci^2
+             r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
            }
          },
          
