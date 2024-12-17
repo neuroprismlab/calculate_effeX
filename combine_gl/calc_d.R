@@ -53,12 +53,12 @@ calc_d <- function(study, d_maps, output_dir, output_basename = 'd_maps', alpha 
           stat.fullres <- d_maps[[i]][[t]]$stat.fullres
           result.fullres <- calculate_effect_size(stat.fullres, study$orig_stat_type[[i]], d_maps, i, t, num_sdx_r2d, alpha_corrected)
 
-          d_maps[[i]][[t]]$d <- result.fullres$d
-          d_maps[[i]][[t]]$sim_ci_lb <- result.fullres$ci[1,]
-          d_maps[[i]][[t]]$sim_ci_ub <- result.fullres$ci[2,]
-          d_maps[[i]][[t]]$r_sq <- result.fullres$r_sq
-          d_maps[[i]][[t]]$r_sq_sim_ci_lb <- result.fullres$r_sq_ci[1,]
-          d_maps[[i]][[t]]$r_sq_sim_ci_ub <- result.fullres$r_sq_ci[2,]
+          d_maps[[i]][[t]]$d.fullres <- result.fullres$d
+          d_maps[[i]][[t]]$sim_ci_lb.fullres <- result.fullres$ci[1,]
+          d_maps[[i]][[t]]$sim_ci_ub.fullres <- result.fullres$ci[2,]
+          d_maps[[i]][[t]]$r_sq.fullres <- result.fullres$r_sq
+          d_maps[[i]][[t]]$r_sq_sim_ci_lb.fullres <- result.fullres$r_sq_ci[1,]
+          d_maps[[i]][[t]]$r_sq_sim_ci_ub.fullres <- result.fullres$r_sq_ci[2,]
  
       }
 
