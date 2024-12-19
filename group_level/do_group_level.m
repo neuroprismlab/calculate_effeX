@@ -195,12 +195,13 @@ for i = 1:length(datasets)
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
-        results.study_info = rmfield(S.study_info,'test');
+        % results.study_info = rmfield(S.study_info,'test');
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
         test_type = infer_test_type(S, test);
         results.study_info.test = test_type;
+        results.study_info.map = S.study_info.map;
 
         results.study_info.date = date;
         
