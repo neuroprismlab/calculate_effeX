@@ -202,6 +202,7 @@ for i = 1:length(datasets)
         test_type = infer_test_type(S, test);
         results.study_info.test = test_type;
         results.study_info.map = S.study_info.map;
+        results.study_info.dataset = S.study_info.dataset;
 
         results.study_info.date = date;
         
