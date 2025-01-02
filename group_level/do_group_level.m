@@ -122,16 +122,16 @@ for i = 1:length(datasets)
     fprintf(['Processing dataset: ',dataset,'\n'])
     
     %TODO: TMP: remove this once we get ukb map
-    if contains(dataset, "ukb")
-        if ~exist('pooling_params_orig')
-            pooling_params_orig = pooling_params;
-        end
-        pooling_params = [0];
-    else
-        if exist('pooling_params_orig')
-            pooling_params = pooling_params_orig;
-        end
-    end
+%     if contains(dataset, "ukb")
+%         if ~exist('pooling_params_orig')
+%             pooling_params_orig = pooling_params;
+%         end
+%         pooling_params = [0];
+%     else
+%         if exist('pooling_params_orig')
+%             pooling_params = pooling_params_orig;
+%         end
+%     end
     
     % Check results exist and prompt overwrite
 
