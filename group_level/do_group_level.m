@@ -90,7 +90,7 @@ save_info.save = 1;
 save_info.overwrite = 1; % initialized
 save_info.use_same = 0;
 save_info.asked = 0;
-testing=0; % USER-DEFINED
+testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -106,7 +106,7 @@ addpath(genpath(reference_dir));
 if testing
     datasets = datasets(1);
     %pooling_params = [1];
-    testing_str = 'test';
+    testing_str = '';
 else
     testing_str = [];
 end
@@ -178,11 +178,6 @@ for i = 1:length(datasets)
     % get results for each test
 
     tests = fieldnames(S.outcome);
-    
-    % TODO: TMP: for testing one specific test, figure out and remove
-    if dataset == "s_pnc_fc_ye.mat"
-        tests = tests(1:10);
-    end
 
 
     for t = 1:length(tests)
@@ -206,7 +201,13 @@ for i = 1:length(datasets)
 
         results.study_info.date = date;
         
-
+        % save mask is stored in study_info, add to results
+        % otherwise, mask will be saved to results by test type below
+        if isfield(S.study_info, 'mask')
+            results.study_info.mask = S.study_info.mask;
+        end
+       
+        
         % For each test type, extract and clean data
 
         if test_type == 'r'
