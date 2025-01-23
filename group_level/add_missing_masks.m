@@ -28,6 +28,8 @@ for i = 1:length(studies)
     end
 end
 
+disp(['Studies missing masks: '])
+disp(studies_wo_masks(:,1))
 datasets_to_load = unique(studies_wo_masks(:,2));
 available_datasets = dir(sub_data_dir);
 available_datasets = available_datasets(~[available_datasets.isdir]); 
@@ -52,7 +54,12 @@ for d = 1:length(datasets_to_load)
     matching_dataset = available_datasets(matching_idx);
     
     % load dataset
+    disp(['loading dataset ', dataset])
     D = load([sub_data_dir, '/', matching_dataset{1}]);
+    
+    if strcmp(dataset, 'hcpep_fc')
+        dataset = 'hcp_ep_fc';
+    end
     
     % find studies that need this dataset's mask
     idx = contains(studies_wo_masks(:,2), dataset);
@@ -71,6 +78,7 @@ for d = 1:length(datasets_to_load)
         if isfield(D.study_info, 'mask')
             results.study_info.mask = D.study_info.mask;
             save(study_file, 'results');
+            disp(['saved ', studies_to_do{a}, ' with mask to ', study_file])
         else
             warning(['Mask for', studies_to_do{a}, 'study is not in study_info. Not saved.'])
         end

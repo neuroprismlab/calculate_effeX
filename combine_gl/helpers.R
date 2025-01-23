@@ -459,6 +459,7 @@ lower_to_upper_triangle <- function(data) {
   m[lower.tri(m)] <- data
   t_m <- t(m)
   new_data <- c(t_m[upper.tri(t_m)])
+  dim(new_data) <- c(1, length(new_data))
   return(new_data)
 }
 
