@@ -32,8 +32,10 @@ check_orientation <- function(data, brain_masks) {
             }
           }
         }
+        print(paste0('also flipping brain mask to reflect the flipped triangle'))
+        brain_masks[[i]]$mask <- t(brain_masks[[i]]$mask)
       }
     }
   }
-  return(data)
+  return(list(data = data, brain_masks = brain_masks))
 }

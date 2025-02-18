@@ -11,8 +11,8 @@ checker <- function(d_maps, output_file = 'checked_d_maps') {
     for (t in names(d_maps[[i]])) {
 
       d <- d_maps[[i]][[t]]$d
-      sim_ci_lb <- d_maps[[i]][[t]]$sim_ci_lb
-      sim_ci_ub <- d_maps[[i]][[t]]$sim_ci_ub
+      sim_ci_lb <- unlist(d_maps[[i]][[t]]$sim_ci_lb)
+      sim_ci_ub <- unlist(d_maps[[i]][[t]]$sim_ci_ub)
       if (grepl("motion.regression", t)) {
         d.fullres <- d_maps[[i]][[t]]$d.fullres
         sim_ci_lb.fullres <- d_maps[[i]][[t]]$sim_ci_lb.fullres

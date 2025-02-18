@@ -98,7 +98,9 @@ brain_masks <- cleaned_data$brain_masks
 data <- cleaned_data$data
 
 # check orientation of FC data with masks
-data <- check_orientation(data, brain_masks)
+oriented_list <- check_orientation(data, brain_masks)
+brain_masks <- oriented_list$brain_masks
+data <- oriented_list$data
 
 # calculate Cohen's d and simultaneous confidence intervals for each study
 d_maps <- calc_d(study, data, output_dir = intermediate_dir)
