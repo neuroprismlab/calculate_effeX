@@ -89,7 +89,7 @@ d_ci <- function(d, n1, n2 = NULL, alpha = 0.05) {
     lower_bound <- d - t_crit * se
     upper_bound <- d + t_crit * se
 
-    return(list(lower_bound, upper_bound))
+    return(c(lower_bound, upper_bound))
 }
 
 
@@ -102,7 +102,7 @@ r_sq_ci <- function(r_sq, n, alpha = 0.05) {
   lower_bound <- r_sq - z_crit * r_sq_se
   upper_bound <- r_sq + z_crit * r_sq_se
   
-  return(list(lower_bound, upper_bound))
+  return(c(lower_bound, upper_bound))
 }
 
 r_ci <- function(r, n, alpha = 0.05) {
@@ -112,7 +112,7 @@ r_ci <- function(r, n, alpha = 0.05) {
   lower_bound <- tanh(atanh(r) - z_95 / sqrt(n-3))
   upper_bound <- tanh(atanh(r) + z_95 / sqrt(n-3))
   
-  return(list(lower_bound, upper_bound))
+  return(c(lower_bound, upper_bound))
 }
 
 #d_ci__from_r_ci <- function(r_ci_lower, r_ci_upper, num_sdx_r2d) {
@@ -134,7 +134,7 @@ d_ci__from_r <- function(r, n, num_sdx_r2d, alpha = 0.05) {
     lower_bound <- num_sdx_r2d * r_ci_lower / (1 - r_ci_lower ^ 2) ^ (1/2)
     upper_bound <- num_sdx_r2d * r_ci_upper / (1 - r_ci_upper ^ 2) ^ (1/2)
 
-    return(list(lower_bound, upper_bound))
+    return(c(lower_bound, upper_bound))
 }
 
 
@@ -148,8 +148,6 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
            r_sq <- stat^2
            r_sq_ci <- sapply(r_sq, function(x) r_sq_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
            #r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
-
-
          },
          
          "t2" = {
