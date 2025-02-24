@@ -93,6 +93,18 @@ d_ci <- function(d, n1, n2 = NULL, alpha = 0.05) {
 }
 
 
+r_sq_ci <- function(r_sq, n, alpha = 0.05) {
+  
+  r_sq_se <- sqrt((4 * r_sq * (1 - r_sq)^2 * (n - 2)^2) / ((n^2 - 1) * (n + 3)))
+
+  z_crit <- qnorm(1 - alpha) # e.g., 0.05 = 1.96
+  
+  lower_bound <- r_sq - z_crit * r_sq_se
+  upper_bound <- r_sq + z_crit * r_sq_se
+  
+  return(list(lower_bound, upper_bound))
+}
+
 r_ci <- function(r, n, alpha = 0.05) {
   
   z_95 <- qnorm(1 - alpha) # e.g., 0.05 = 1.96
@@ -134,8 +146,8 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
            ci <- sapply(stat, function(x) d_ci__from_r(x, n = d_maps[[i]][[t]]$n[1], num_sdx_r2d = num_sdx_r2d, alpha = alpha_corrected))
            
            r_sq <- stat^2
-           r_ci <- sapply(stat, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
-           r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
+           r_sq_ci <- sapply(r_sq, function(x) r_sq_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+           #r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
 
 
          },
@@ -147,8 +159,8 @@ calculate_effect_size <- function(stat, stat_type, d_maps, i, t, num_sdx_r2d, al
              
              r <- stat / sqrt(stat^2 + (d_maps[[i]][[t]]$n1[1] + d_maps[[i]][[t]]$n2[1] - 2))
              r_sq <- r^2
-             r_ci <- sapply(r, function(x) r_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
-             r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
+             r_sq_ci <- sapply(r_sq, function(x) r_sq_ci(x, n = d_maps[[i]][[t]]$n[1], alpha = alpha_corrected))
+             #r_sq_ci <- apply(r_ci, c(1, 2), function(x) unlist(x)^2) # TODO: doing list-wise because sapply returns matrix of lists - simplify
            }
          },
          
