@@ -21,8 +21,10 @@ checker <- function(d_maps, output_file = 'checked_d_maps') {
       
       # transpose if needed
       
-      if (dim(d)[1] > 1) {
-        d_maps[[i]][[t]]$d <- t(d)
+      if (!is.null(dim(d))) {
+        if (dim(d)[1] > 1) {
+          d_maps[[i]][[t]]$d <- t(d)
+        }
       }
       
       if (length(sim_ci_lb)[1] > 1) {
@@ -36,8 +38,10 @@ checker <- function(d_maps, output_file = 'checked_d_maps') {
       # repeat for regression case -  # TODO: could also simplify + combine w above
       if (grepl("motion.regression", t)) {
         
-        if (dim(d.fullres)[1] > 1) {
-          d_maps[[i]][[t]]$d.fullres <- t(d.fullres)
+        if (!is.null(dim(d.fullres))) {
+          if (dim(d.fullres)[1] > 1) {
+            d_maps[[i]][[t]]$d.fullres <- t(d.fullres)
+          }
         }
         
         if (length(sim_ci_lb.fullres)[1] > 1) {
