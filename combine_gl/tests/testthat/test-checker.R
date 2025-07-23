@@ -114,7 +114,7 @@ test_that("checker works with real test data", {
   # Set intermediate_dir for the checker function
   intermediate_dir <- test_data$intermediate_dir
   
-  result <- checker(d_maps = test_data$d_maps, output_file = "real_data_test")
+  result <- checker(d_maps = test_data$d_maps, output_file = "real_data_test", intermediate_dir = intermediate_dir)
   
   # Test basic structure
   expect_type(result, "list")
@@ -137,7 +137,7 @@ test_that("checker preserves data structure with real data", {
   original_studies <- names(test_data$d_maps)
   original_test_counts <- sapply(test_data$d_maps, length)
   
-  result <- checker(d_maps = test_data$d_maps, output_file = "structure_test")
+  result <- checker(d_maps = test_data$d_maps, output_file = "structure_test", intermediate_dir = intermediate_dir)
   
   # Should preserve overall structure
   expect_equal(names(result), original_studies)
@@ -174,7 +174,7 @@ test_that("checker handles motion regression cases with real data", {
   
   intermediate_dir <- test_data$intermediate_dir
   
-  result <- checker(d_maps = test_data$d_maps, output_file = "motion_test")
+  result <- checker(d_maps = test_data$d_maps, output_file = "motion_test", intermediate_dir = intermediate_dir)
   
   # Look for motion regression cases in the real data
   found_motion_regression <- FALSE
@@ -250,7 +250,7 @@ test_that("checker processes d matrices correctly", {
     }
   }
   
-  result <- checker(d_maps = test_data$d_maps, output_file = "d_matrix_test")
+  result <- checker(d_maps = test_data$d_maps, output_file = "d_matrix_test", intermediate_dir = intermediate_dir)
   
   cat("d matrix info after checker:\n")
   for (study_name in names(result)) {
@@ -283,7 +283,7 @@ test_that("checker saves output file with real data", {
   intermediate_dir <- test_data$intermediate_dir
   output_filename <- "real_data_save_test"
   
-  result <- checker(d_maps = test_data$d_maps, output_file = output_filename)
+  result <- checker(d_maps = test_data$d_maps, output_file = output_filename, intermediate_dir = intermediate_dir)
   
   # Check if file was saved
   expected_file <- file.path(intermediate_dir, paste0(output_filename, "_", Sys.Date(), ".RData"))
@@ -329,7 +329,7 @@ test_that("checker preserves data values with real data", {
     }
   }
   
-  result <- checker(d_maps = test_data$d_maps, output_file = "value_preservation_test")
+  result <- checker(d_maps = test_data$d_maps, output_file = "value_preservation_test", intermediate_dir = intermediate_dir)
   
   # Verify values are preserved after processing
   for (study_name in names(result)) {
@@ -377,7 +377,7 @@ test_that("checker integration test with real data", {
   # Run checker
   cat("\nRunning checker...\n")
   result <- checker(d_maps = test_data$d_maps, 
-                    output_file = "integration_real_data")
+                    output_file = "integration_real_data", intermediate_dir = intermediate_dir)
   
   cat("checker completed successfully!\n")
   cat("Processed", length(result), "studies\n")

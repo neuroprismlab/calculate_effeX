@@ -2,7 +2,7 @@
 # input: sim_ci (list)
 # output: d_maps (with proper dimensions)
 
-checker <- function(d_maps, output_file = 'checked_d_maps') {
+checker <- function(d_maps, output_file = 'checked_d_maps', intermediate_dir = intermediate_dir) {
   
   output_path = file.path(intermediate_dir, paste0(output_file, '_', Sys.Date(), '.RData'))
   
