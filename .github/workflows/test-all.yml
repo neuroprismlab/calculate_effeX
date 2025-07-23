@@ -1,0 +1,133 @@
+# .github/workflows/test-all.yml
+# Multi-language testing workflow for R and MATLAB components
+
+name: Test All Components
+
+on:
+  push:
+    branches: [ create-tests ]  # Only run on your create-tests branch
+  pull_request:
+    branches: [ create-tests ]  # Only run on PRs to create-tests branch
+  workflow_dispatch:             # Allow manual triggering from any branch
+
+jobs:
+  # Test R scripts in combine_gl directory
+  test-r-combine:
+    runs-on: ubuntu-latest
+    name: Test R (combine_gl)
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up R
+      uses: r-lib/actions/setup-r@v2
+      with:
+        r-version: '4.3.0'
+        
+    - name: Install R packages
+      run: |
+        install.packages(c("testthat", "R.matlab"))
+      shell: Rscript {0}
+      
+    - name: Run R tests
+      working-directory: combine_gl
+      run: |
+        library(testthat)
+        
+        # Source your R functions
+        source("clean_data.R")
+        source("calc_d.R") 
+        source("check_orientation.R")
+        source("checker.R")
+        source("helpers.R")
+        
+        # Run R tests
+        test_dir("tests/testthat", reporter = "progress")
+        
+        cat("R tests completed successfully!\n")
+      shell: Rscript {0}
+
+  # Test MATLAB scripts in group_level directory  
+  test-matlab-group:
+    runs-on: ubuntu-latest
+    name: Test MATLAB (group_level)
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up MATLAB
+      uses: matlab-actions/setup-matlab@v2
+      with:
+        release: R2023b  # Adjust version as needed
+        
+    - name: Run MATLAB group_level tests
+      uses: matlab-actions/run-tests@v2
+      with:
+        source-folder: group_level
+        test-results-junit: group_level_test_results.xml
+        code-coverage-cobertura: group_level_coverage.xml
+        
+    - name: Upload group_level test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: group-level-test-results
+        path: |
+          group_level_test_results.xml
+          group_level_coverage.xml
+
+  # Test MATLAB scripts in subject_level directory
+  test-matlab-subject:
+    runs-on: ubuntu-latest  
+    name: Test MATLAB (subject_level)
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up MATLAB
+      uses: matlab-actions/setup-matlab@v2
+      with:
+        release: R2023b
+        
+    - name: Run MATLAB subject_level tests
+      uses: matlab-actions/run-tests@v2
+      with:
+        source-folder: subject_level
+        test-results-junit: subject_level_test_results.xml
+        code-coverage-cobertura: subject_level_coverage.xml
+        
+    - name: Upload subject_level test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: subject-level-test-results
+        path: |
+          subject_level_test_results.xml
+          subject_level_coverage.xml
+
+  # Summary job that depends on all test jobs
+  test-summary:
+    runs-on: ubuntu-latest
+    name: Test Summary
+    needs: [test-r-combine, test-matlab-group, test-matlab-subject]
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        echo "Test Results Summary:"
+        echo "R (combine_gl): ${{ needs.test-r-combine.result }}"
+        echo "MATLAB (group_level): ${{ needs.test-matlab-group.result }}"
+        echo "MATLAB (subject_level): ${{ needs.test-matlab-subject.result }}"
+        
+        if [[ "${{ needs.test-r-combine.result }}" != "success" || 
+              "${{ needs.test-matlab-group.result }}" != "success" || 
+              "${{ needs.test-matlab-subject.result }}" != "success" ]]; then
+          echo "Some tests failed!"
+          exit 1
+        else
+          echo "All tests passed!"
+        fi
