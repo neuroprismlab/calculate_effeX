@@ -40,6 +40,7 @@ jobs:
         source("calc_d.R") 
         source("check_orientation.R")
         source("checker.R")
+        source("helpers.R")
         
         # Run R tests
         test_dir("tests/testthat", reporter = "progress")
