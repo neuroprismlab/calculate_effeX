@@ -108,6 +108,14 @@ d_maps <- calc_d(study, data, output_dir = intermediate_dir)
 # checker to check dimensions (and probably more things eventually)
 data <- checker(d_maps)
 
+# load template data and phen_keys
+template <- readNIfTI("data/template_nifti.nii.gz")  # assumes MNI - TODO: get actual ref
+template <- template@.Data
+phen_keys <- read.csv('data/phen_key.csv')
+
+# combine all data together into variable v for saving purposes
+v <- list(study = study, brain_masks = brain_masks, data = data, template = template, phen_keys = phen_keys)
+
 # save the final results
-save(study, data, brain_masks, file = final_output_path)
+save(v, file = final_output_path)
 cat(paste('Results saved in',final_output_path))
