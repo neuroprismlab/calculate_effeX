@@ -46,7 +46,7 @@ all_motion <- c('none', 'regression', 'threshold')  # c('none', 'regression', 't
 all_pooling <- c('net', 'none') #  # c('none','net')
 plot_multi <- c(FALSE) # TRUE, FALSE
 
-all_plot_combination_styles <- c('meta')   # c('single','meta','overlapping') # note: overlapping can only be used for manuscript
+all_plot_combination_styles <- c('single', 'meta')   # c('single','meta','overlapping') # note: overlapping can only be used for manuscript
 all_grouping_var <- c('category')          # c('none', 'category', 'orig_stat_type') # used only for meta & overlap plots - TODO: separate out?
 all_manuscript_plot_types <- c('simci')  # c('simci', 'spatial', 'spatial_pow_thr', 'spatial_pow_n_thr', 'density', 'density_binned', 'power', 'power_n','power_binned','power_n_binned') # only used for plot_output_style = 'manuscript'
 
