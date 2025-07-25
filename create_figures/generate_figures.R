@@ -11,27 +11,13 @@ library(ggpubr) # requires svglite
 library(devtools) # for installing/loading utils
 library(BrainEffeX.utils) 
 
-## Load utils
-
-# Option 1. simple add local scripts to path (for dev):
-# base_dir <- "/Users/stephanienoble/Library/CloudStorage/GoogleDrive-s.noble@northeastern.edu/My Drive"
-# utils_package_local <- paste0(base_dir,"/Lab/xMore/Software/scripts/R/myscripts/effect_size/BrainEffeX_utils/")
-# load_all(utils_package_local)
-
-# Option 2. full install of local package (for dev):
-# utils_package_local <- paste0(base_dir,"/xMore/Software/scripts/R/myscripts/effect_size/BrainEffeX_utils/")
-# install(utils_package_local)
-# library(BrainEffeX.utils)
-
-# Option 3. install package from github:
-# utils_github_path <- "neuroprismlab/BrainEffeX_utils"
-# install_github(utils_github_path)
-# library(BrainEffeX.utils)
-
-
 ## User-defined paths & parameters
 
 # input and output directories
+
+# path to file containing v
+# this is the output file from combine_gl master.R script
+v_data_path <- "combine_gl/tests/test_data/output/braineffex_data_2025-07-25.RData"
 
 data_dir <- paste0("combine_gl/tests/test_data/output/")
 out_basename_basename <- "create_figures/output/"
@@ -82,7 +68,8 @@ if (plot_output_style == 'shiny') {
   use_minimal_title <- TRUE # cleaner title for manuscript
 }
 
-
+# load data (v)
+load(v_data_path)
 
 ## Loop over plot types and styles
 
@@ -101,20 +88,6 @@ for (pooling in all_pooling) {
             combo_name <- paste0('pooling.', pooling, '.motion.', motion, '.mv.none')
             mv_combo_basename <- paste0('pooling.', pooling, '.motion.', motion, '.mv.multi')
             
-            # Correct args
-            
-            # if (plot_combination_style == 'single' & grouping_var != 'none') {
-            #   grouping_var <- 'none'
-            #   cat("Warning: grouping_var set to 'none' for single plots\n")
-            # }
-            
-            ## Load data
-            
-            if (!exists("v")) {
-              v <- load_data(data_dir)
-            }
-            
-            
             ## Run meta-analysis, if specified
             
             # TODO: move to combine_gl with other more intensive processing / stat estimates & run all relevantmeta beforehand
@@ -132,39 +105,11 @@ for (pooling in all_pooling) {
               if (!(meta_str %in% names(v))) { # check if this grouping var already exists in data
                 try_meta_file <- TRUE
               } else if (!(combo_name %in% names(v[[meta_str]]$data[[1]]))) { # check if this combo_name has been run
-                # } else if (!any(grepl(mv_combo_basename,names(v[[meta_str]]$data[[1]])))) { # multivariate
                 try_meta_file <- TRUE
               }
-              
-              # TODO: will also have to catch the case where d is defined but r_sq is not
-              
-              # check if saved meta file contains the meta for this grouping var / combo
-              # if (try_meta_file) {
-              #   if (file.exists(meta_fn)) { # try to read pre-saved meta-analysis
-              #     load(meta_fn)
-              #     if (!(meta_str %in% names(v))) { # check again for grouping var
-              #       run_meta <- TRUE
-              #     } else if (!(combo_name %in% names(v[[meta_str]]$data[[1]]))) { # check again for combo
-              #       # } else if (!any(grepl(mv_combo_basename,names(v[[meta_str]]$data[[1]])))) { # multivariate
-              #       run_meta <- TRUE
-              #     }
-              #   } else { # no file
-              #     run_meta <- TRUE
-              #   }
-              #   
-              # }
             }
             
-            # if (run_meta) {
-            #   v <- meta_analysis(v, v$brain_masks, combo_name, grouping_var = grouping_var)
-            #   v <- meta_analysis(v, v$brain_masks, mv_combo_basename, grouping_var = grouping_var) # add multivariate
-            #   save(v, file = meta_fn)
-            # }
-            
-            
-            
-            
-            
+           
             if (make_plots) {
               
               ## Set up unique identifiers for each plot
