@@ -116,6 +116,9 @@ phen_keys <- read.csv('data/phen_key.csv')
 # combine all data together into variable v for saving purposes
 v <- list(study = study, brain_masks = brain_masks, data = data, template = template, phen_keys = phen_keys)
 
+# run meta-analysis and add results to v
+v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
+
 # save the final results
 save(v, file = final_output_path)
 cat(paste('Results saved in',final_output_path))
