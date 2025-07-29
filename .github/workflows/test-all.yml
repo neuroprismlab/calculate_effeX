@@ -70,11 +70,12 @@ jobs:
           fprintf('Starting MATLAB group-level tests...\n');
           
           % Check if test file exists
-          if exist('run_group_level_tests_simple.m', 'file')
+          if exist('tests/run_group_level_tests.m', 'file')
               fprintf('Found custom test file, running tests...\n');
               
               % Run custom tests
-              test_results = run_group_level_tests_simple();
+              addpath('tests');
+              test_results = run_group_level_tests();
               
               % Check results and exit with appropriate code
               if test_results.tests_failed > 0
