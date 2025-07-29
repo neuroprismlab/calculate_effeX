@@ -191,21 +191,21 @@ jobs:
         
         if [[ "${{ needs.test-r-combine.result }}" == "success" ]]; then
           echo "✅ R tests: PASSED"
-          ((success_count++))
+          success_count=$((success_count + 1))
         else
           echo "❌ R tests: FAILED"
         fi
         
         if [[ "${{ needs.test-matlab-group.result }}" == "success" ]]; then
           echo "✅ MATLAB group-level: PASSED"
-          ((success_count++))
+          success_count=$((success_count + 1))
         else
           echo "❌ MATLAB group-level: FAILED"
         fi
         
         if [[ "${{ needs.test-matlab-subject.result }}" == "success" ]]; then
           echo "✅ MATLAB subject-level: PASSED"
-          ((success_count++))
+          success_count=$((success_count + 1))
         else
           echo "❌ MATLAB subject-level: FAILED"
         fi
