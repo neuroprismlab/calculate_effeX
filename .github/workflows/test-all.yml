@@ -104,7 +104,7 @@ jobs:
       shell: matlab -batch "{0}"
       
     - name: Upload MATLAB test outputs (if any)
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: matlab-group-test-outputs
@@ -136,7 +136,7 @@ jobs:
         code-coverage-cobertura: subject_level_coverage.xml
         
     - name: Upload subject_level test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: subject-level-test-results
