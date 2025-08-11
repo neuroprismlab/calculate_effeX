@@ -9,7 +9,9 @@
 library(metafor)
 library(ggpubr) # requires svglite
 library(devtools) # for installing/loading utils
-library(BrainEffeX.utils) 
+library(BrainEffeX.utils)
+library(ggpubr)
+
 
 ## User-defined paths & parameters
 
@@ -20,7 +22,7 @@ library(BrainEffeX.utils)
 v_data_path <- "combine_gl/tests/test_data/output/braineffex_data_2025-07-25.RData"
 
 data_dir <- paste0("combine_gl/tests/test_data/output/")
-out_basename_basename <- "create_figures/output/"
+out_basename_basename <- "create_figures/output_july-30-2025/"
 
 # plot params - USER-DEFINED
 
@@ -69,7 +71,9 @@ if (plot_output_style == 'shiny') {
 }
 
 # load data (v)
-load(v_data_path)
+if(!exists("v")) {
+  load(v_data_path)
+}
 
 ## Loop over plot types and styles
 
