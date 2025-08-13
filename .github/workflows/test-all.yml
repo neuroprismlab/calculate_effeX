@@ -11,10 +11,10 @@ on:
   workflow_dispatch:             # Allow manual triggering from any branch
 
 jobs:
-  # Test R scripts in combine_gl directory
-  test-r-combine:
+  # Test R scripts in effect_size directory
+  test-r-effect:
     runs-on: ubuntu-latest
-    name: Test R (combine_gl)
+    name: Test R (effect_size)
     
     steps:
     - name: Checkout repository
@@ -31,7 +31,7 @@ jobs:
       shell: Rscript {0}
       
     - name: Run R tests
-      working-directory: combine_gl
+      working-directory: effect_size
       run: |
         library(testthat)
         
@@ -173,14 +173,14 @@ jobs:
   test-summary:
     runs-on: ubuntu-latest
     name: Test Summary
-    needs: [test-r-combine, test-matlab-group, test-matlab-subject]
+    needs: [test-r-effect, test-matlab-group, test-matlab-subject]
     if: always()
     
     steps:
     - name: Check test results
       run: |
         echo "=== Test Results Summary ==="
-        echo "R (combine_gl): ${{ needs.test-r-combine.result }}"
+        echo "R (effect_size): ${{ needs.test-r-effect.result }}"
         echo "MATLAB (group_level): ${{ needs.test-matlab-group.result }}"
         echo "MATLAB (subject_level): ${{ needs.test-matlab-subject.result }}"
         echo ""
@@ -189,7 +189,7 @@ jobs:
         success_count=0
         total_count=3
         
-        if [[ "${{ needs.test-r-combine.result }}" == "success" ]]; then
+        if [[ "${{ needs.test-r-effect.result }}" == "success" ]]; then
           echo "✅ R tests: PASSED"
           success_count=$((success_count + 1))
         else
@@ -216,7 +216,7 @@ jobs:
         if [[ $success_count -eq $total_count ]]; then
           echo "🎉 All tests passed!"
           exit 0
-        elif [[ "${{ needs.test-r-combine.result }}" == "success" ]]; then
+        elif [[ "${{ needs.test-r-effect.result }}" == "success" ]]; then
           echo "⚠️ R tests passed, but some MATLAB tests failed"
           echo "This might be due to licensing or toolbox availability"
           echo "Core pipeline functionality is verified ✓"
