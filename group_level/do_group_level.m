@@ -56,7 +56,7 @@
 %   - data
 %       - <pooling strategy>
 %            - <motion strategy>
-%                 - b_standardized
+%                 - stat
 %                 - p
 %                 - std_brain
 %                 - std_score
@@ -77,6 +77,7 @@ data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/helper_scripts/'];
+reference_dir = [current_dir, '/reference/'];
 
 % params
 
@@ -85,9 +86,11 @@ low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1];
 multivariate_params = [0, 1];
+save_info.save = 1;
+save_info.overwrite = 1; % initialized
 save_info.use_same = 0;
 save_info.asked = 0;
-testing=0; % USER-DEFINED
+testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -96,13 +99,14 @@ datasets = {filenames.name};
 
 % set paths
 addpath(genpath(scripts_dir));
+addpath(genpath(reference_dir));
 
 % setup for tests
 
 if testing
-    datasets = datasets(7);
+    datasets = datasets(1);
     %pooling_params = [1];
-    testing_str = 'test';
+    testing_str = '';
 else
     testing_str = [];
 end
@@ -118,16 +122,16 @@ for i = 1:length(datasets)
     fprintf(['Processing dataset: ',dataset,'\n'])
     
     %TODO: TMP: remove this once we get ukb map
-    if contains(dataset, "ukb")
-        if ~exist('pooling_params_orig')
-            pooling_params_orig = pooling_params;
-        end
-        pooling_params = [0];
-    else
-        if exist('pooling_params_orig')
-            pooling_params = pooling_params_orig;
-        end
-    end
+%     if contains(dataset, "ukb")
+%         if ~exist('pooling_params_orig')
+%             pooling_params_orig = pooling_params;
+%         end
+%         pooling_params = [0];
+%     else
+%         if exist('pooling_params_orig')
+%             pooling_params = pooling_params_orig;
+%         end
+%     end
     
     % Check results exist and prompt overwrite
 
@@ -135,7 +139,6 @@ for i = 1:length(datasets)
 
     S = load(data_path,'study_info');
     results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map}, '_'),'*'];
-    save_info.overwrite = 1;
     
     if ~isempty(dir(results_file_pre_prefix))
         if ~save_info.asked || ~save_info.use_same
@@ -161,9 +164,12 @@ for i = 1:length(datasets)
                save_info.asked = 1;
             end
         end
+        save_info.save = save_info.overwrite;
+    else
+        save_info.save = 1;
     end
        
-    if save_info.overwrite
+    if save_info.save
     % Load & check data
 
     S = load(data_path);
@@ -172,11 +178,6 @@ for i = 1:length(datasets)
     % get results for each test
 
     tests = fieldnames(S.outcome);
-    
-    % TODO: TMP: for testing one specific test, figure out and remove
-    if dataset == "s_pnc_fc_ye.mat"
-        tests = tests(1:10);
-    end
 
 
     for t = 1:length(tests)
@@ -189,16 +190,24 @@ for i = 1:length(datasets)
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % TODO: later this is "results.data.(result_name)" - resolve this difference
-        results.study_info = rmfield(S.study_info,'test');
+        % results.study_info = rmfield(S.study_info,'test');
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
         test_type = infer_test_type(S, test);
         results.study_info.test = test_type;
+        results.study_info.map = S.study_info.map;
+        results.study_info.dataset = S.study_info.dataset;
 
         results.study_info.date = date;
         
-
+        % save mask is stored in study_info, add to results
+        % otherwise, mask will be saved to results by test type below
+        if isfield(S.study_info, 'mask')
+            results.study_info.mask = S.study_info.mask;
+        end
+       
+        
         % For each test type, extract and clean data
 
         if test_type == 'r'
@@ -376,12 +385,14 @@ for i = 1:length(datasets)
 
         for do_multivariate = multivariate_params
             if do_multivariate
-                        test_type=['multi_',test_type];
-                        % TODO: consider whether safe to overwrite
-                        mv_test_type = test_type;
+                test_type=['multi_',test_type];
+                % TODO: consider whether safe to overwrite
+                mv_test_type = test_type;
             else
                 mv_test_type = 'none';
             end
+            disp(['   > statistical test = ', test_type])
+
             
             for do_pooling = pooling_params
 
@@ -432,14 +443,14 @@ for i = 1:length(datasets)
                     pooling_method = 'none';
                 end
 
-                disp(['   > pooling = ', pooling_method])
+                disp(['     > pooling = ', pooling_method])
 
                 for motion_method_it = 1:length(motion_method_params)
 
                     %% Account/correct for motion as specified
 
                     motion_method = motion_method_params{motion_method_it};
-                    disp(['     > motion method = ', motion_method])
+                    disp(['       > motion method = ', motion_method])
 
                     score2 = score; % changes if applying motion threshold
 
@@ -473,15 +484,15 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2,motion);
+                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2,score2,motion);
                     else
-                        [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
+                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
                     end
 
                     %% Append results data
 
                     result_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
-                    results.data.(result_name).b_standardized = b_standardized;
+                    results.data.(result_name).stat = stat;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
                     results.data.(result_name).n1 = n1;
@@ -492,6 +503,12 @@ for i = 1:length(datasets)
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
                     
+                    if strcmp(motion_method,'regression')
+                        results.data.(result_name).stat_fullres = stat_fullres;
+                        results.data.(result_name).p_fullres = p_fullres;
+                    end
+                    
+                        
 
                 end % motion
             end % pooling
@@ -520,8 +537,9 @@ end % datasets
 %% Function definitions
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
+% TODO: this is also the standard analogue to partial corr estimates, as validated by our effect_size_ref_validation. Revisit.
 
-function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,brain,score,confounds)
+function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -582,97 +600,138 @@ function [b_standardized,p,n,n1,n2,std_brain,std_score] = run_test(test_type,bra
  
 
     % Perform test and get results
+
+    % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
+    % Note: when dealing with confounds, "stat/p" is an estimate of the statistic in a multiple regression framework
+    %       and stat_fullres / p_fullres is an estimate of the statistic in the case of zero confounds
     
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
         
         case 't'
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
+            % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
            
-            % need intercept so can't use corr
-            n = size(brain,1);
-            mdl = Regression_fast_mass_univ_y([ones(n,1), confounds], brain, 1); % note: fitlm is built-in for this but too slow for this purpose
-
-            b_standardized = mdl(1,:,1);
-            p = mdl(1,:,2);
-            std_score=1; % for one-sample t-test b->r conversion, in order to not affect the result % TODO: this isn't used after all - remove
+            [stat,p,B] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
+            
+            if ~isempty(confounds)
+                brain_res_plus_intercept = brain - [ones(n,1), confounds] * B + B(1);
+                [stat_fullres, p_fullres] = Regression_faster_mass_univ_y(ones(n,1), brain_res_plus_intercept, 1);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
+            end
 
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
             if isempty(confounds)
-                [b_standardized,p]=corr(brain,score);
+                [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
             else
-                [b_standardized,p]=partialcorr(brain,score,confounds);
+                [~, stat_fullres, p_fullres, ~, stat, p] = partial_and_semipartial_corr(brain, score, confounds, n);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
      
-            % TODO: revisit whether addl info needed for subsequent R^2 or d - https://www3.nd.edu/~rwilliam/stats1/x92.pdf 
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
-
 
 
         case 'r'
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
            
             if isempty(confounds)
-                [b_standardized,p]=corr(score,brain);
+                [stat,p]=corr(score,brain);
             else
-                [b_standardized,p]=partialcorr(score,brain,confounds);
+                [stat_fullres, ~, p_fullres, stat, ~, p] = partial_and_semipartial_corr(score, brain, confounds, n);
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
             end
 
 
         case 'multi_t'
             %  Hotelling t-Test (Multivariate): brain is outcome
-            
-            % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
-
-            % 2. Optional: regress confounds from brain
+           
+            % 1. If confounds: regress confounds from brain
             if isempty(confounds)
-                brain2 = brain_reduced;
+                brain2 = brain;
             else
- confound_centered = confounds - mean(confounds);
+                confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
-                brain2 = brain_reduced - P_confound * brain_reduced;
+                brain2 = brain - P_confound * brain;
             end
-
-            % 3. Hotelling t-test 
-            [t_sq,p] = Hotelling_T2_Test(brain2); 
-            b_standardized = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+ 
+            % 2. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
             
-            % d=t --> same result as from a direct estimate of d (sample):
-            % d = sqrt(mahal(zeros(1,size(brain2,2)),brain2));
-            % and same p as from manova1:
-            % [~, p, ~] = manova1(brain2, ones(size(brain2, 1), 1));
+            % 3. Hotelling t-test 
+            [t_sq,p] = Hotelling_T2_Test(brain_reduced); 
+            stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
 
+            if ~isempty(confounds)
+                stat_fullres = stat;
+                p_fullres = p;
+                stat = [];
+                p = [];
 
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
+            end
 
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
-            % 1. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
-
-            % 2. Optional: regress confounds from brain and score
+            % 1. If confounds: regress confounds from brain and score
             if isempty(confounds)
-                brain2=brain_reduced;
+                brain2=brain;
                 score2=score;
             else
-                confounds = confounds(complete_cases,:); % filter for only complete cases
+                % confounds = confounds(complete_cases,:); % filter for only complete cases
                 confound_centered = confounds - mean(confounds);
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
-                brain2 = brain_reduced - P_confound * brain_reduced;
+                brain2 = brain - P_confound * brain;
                 score2 = score - P_confound * score;
+            end
+            
+            % 2. Dimensionality reduction - slow (~10 sec)
+            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
+
+            
+            % 3. Canonical Correlation (top component)
+            [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
+            p = stats.pChisq; % TODO: compare with look up from Winkler et al table
+
+            % If confounds: repeat Canonical Correlation with semipartial analogue
+            if ~isempty(confounds)
                 
+                stat_fullres = stat;
+                p_fullres = p;
+                
+                varargout{1} = stat_fullres;
+                varargout{2} = p_fullres;
+
+                % relative to total variance in y, without regression (akin to semipartial r)
+                switch test_type
+                case 'multi_t2'
+                    [~,brain_reduced_w_confound] = pca(brain, 'NumComponents', n_components); 
+                    % stat_full_y is the correlation obtained without regressing confounds from y
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced_w_confound,score2);
+                case 'multi_r'
+                    [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score);
+                end
+                %p = stats.pChisq;
             end
 
-            % 3. Canonical Correlation (top component)
-            [brain_comp,score_comp,b_standardized,~,~,stats] = canoncorr(brain2,score2);
-            p = stats.pChisq; % TODO: compare with look up from Winkler et al table
-            %d = 2*r/sqrt(1-r^2); % TODO: confirm
+            % If t-test: convert to t-stat
+            if strcmp(test_type,'multi_t2')
+                if ~isempty(confounds)
+                    % use conversion from partial_and_semipartial_corr.m function
+                    stat = r_to_test_stats(stat, n, 1, 2);
+                    varargout{1} = r_to_test_stats(stat_fullres, n, 1, 2);
+                else
+                    stat = r_to_test_stats(stat, n, 0, 2);
+                end
+            end
 
 
     end
 end
             
-
