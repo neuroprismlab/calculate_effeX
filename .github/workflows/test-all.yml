@@ -5,9 +5,9 @@ name: Test All Components
 
 on:
   push:
-    branches: [ create-tests ]  # Only run on your create-tests branch
+    branches: [ main ] 
   pull_request:
-    branches: [ create-tests ]  # Only run on PRs to create-tests branch
+    branches: [ main ]  
   workflow_dispatch:             # Allow manual triggering from any branch
 
 jobs:
