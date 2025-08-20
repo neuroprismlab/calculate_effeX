@@ -108,7 +108,7 @@ if testing
     %pooling_params = [1];
     testing_str = '';
 else
-    testing_str = [];
+    testing_str = [''];
 end
 
 
@@ -138,36 +138,36 @@ for i = 1:length(datasets)
     data_path = [data_dir, dataset];
 
     S = load(data_path,'study_info');
-    results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map}, '_'),'*'];
+    results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map, testing_str}, '_'),'*'];
     
-    if ~isempty(dir(results_file_pre_prefix))
-        if ~save_info.asked || ~save_info.use_same
-
-            user_response = input(sprintf(['Results for ',results_file_pre_prefix,' already exist. Overwrite? [yes/no]\n> ']),'s');
-            if strcmp(user_response,'yes')
-                fprintf(['Replacing results ',results_file_pre_prefix,'.\n']);
-                save_info.overwrite = 1;
-            else
-                fprintf(['Keeping existing results ',results_file_pre_prefix,'.\n']);
-                save_info.overwrite = 0;
-            end
-
-            if ~save_info.asked
-                user_response = input(sprintf(['Repeat for all datasets? [yes/no]\n> ']),'s');
-                if strcmp(user_response,'yes')
-                    fprintf('Using this setting for all.\n');
-                    save_info.use_same = 1;
-                else
-                    fprintf('Okay, will ask each time.\n');
-                   save_info.use_same = 0;
-               end
-               save_info.asked = 1;
-            end
-        end
-        save_info.save = save_info.overwrite;
-    else
-        save_info.save = 1;
-    end
+%     if ~isempty(dir(results_file_pre_prefix))
+%         if ~save_info.asked || ~save_info.use_same
+% 
+%             user_response = input(sprintf(['Results for ',results_file_pre_prefix,' already exist. Overwrite? [yes/no]\n> ']),'s');
+%             if strcmp(user_response,'yes')
+%                 fprintf(['Replacing results ',results_file_pre_prefix,'.\n']);
+%                 save_info.overwrite = 1;
+%             else
+%                 fprintf(['Keeping existing results ',results_file_pre_prefix,'.\n']);
+%                 save_info.overwrite = 0;
+%             end
+% 
+%             if ~save_info.asked
+%                 user_response = input(sprintf(['Repeat for all datasets? [yes/no]\n> ']),'s');
+%                 if strcmp(user_response,'yes')
+%                     fprintf('Using this setting for all.\n');
+%                     save_info.use_same = 1;
+%                 else
+%                     fprintf('Okay, will ask each time.\n');
+%                    save_info.use_same = 0;
+%                end
+%                save_info.asked = 1;
+%             end
+%         end
+%         save_info.save = save_info.overwrite;
+%     else
+%         save_info.save = 1;
+%     end
        
     if save_info.save
     % Load & check data
@@ -178,7 +178,6 @@ for i = 1:length(datasets)
     % get results for each test
 
     tests = fieldnames(S.outcome);
-
 
     for t = 1:length(tests)
         
@@ -379,6 +378,17 @@ for i = 1:length(datasets)
 
         results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, testing_str], '_')];
 
+        results_file_path = [results_file_prefix, '.mat'];
+        %results = struct();
+        if exist(results_file_path, 'file')
+            tmp = load(results_file_path);
+            if isfield(tmp, 'results')
+                results.data = tmp.results.data;
+            end
+        end
+        if ~isfield(results, 'data')
+            results.data = struct();
+        end
         
 
         %% Run analysis for each do_pooling + motion + do_multivariate method
@@ -445,6 +455,10 @@ for i = 1:length(datasets)
 
                 disp(['     > pooling = ', pooling_method])
 
+                base_m2   = m2;      % brain matrix after pooling choice
+                baseScore = score;   % score vector aligned with base_m2
+                baseMotion = motion; % motion vector aligned with base_m2
+
                 for motion_method_it = 1:length(motion_method_params)
 
                     %% Account/correct for motion as specified
@@ -452,21 +466,48 @@ for i = 1:length(datasets)
                     motion_method = motion_method_params{motion_method_it};
                     disp(['       > motion method = ', motion_method])
 
-                    score2 = score; % changes if applying motion threshold
+                    raw_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
+                    result_name = matlab.lang.makeValidName(raw_name);
+                    
+                    % if already present, skip work
+                    if isfield(results.data, result_name)
+                        disp(['Skipping (already exists): ', result_name]);
+                        continue
+                    end
+                    
+                    % reset working copies for each motion method
+                    m2_work   = base_m2;
+                    score2    = baseScore;
+                    motion2   = baseMotion;   % keep a local to make intent clear
+    
+                    % score2 = score; % changes if applying motion threshold
 
                     if ~strcmp(motion_method,'none')
 
                         % Align motion and data by subject - REMOVED 051624  (removed the commented lines lines that align subjects) - TODO: check + confirm the checker uses similar logic as the removed lines
             
                         % threshold if specified
-                        if strcmp(motion_method,'threshold')
-                            low_motion_idx = find(motion<low_motion_threshold); % TODO: consider saving
-                            m2 = m2(low_motion_idx,:);
+                        if strcmp(motion_method,'threshold1')
+                            low_motion_threshold = 0.1;
+                            low_motion_idx = find(motion2<low_motion_threshold); % TODO: consider saving
+                            m2_work = m2_work(low_motion_idx,:);
                             if ~isempty(score2)
                                 score2 = score2(low_motion_idx);
                             end
-                            std_sub_motion = std(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
-                            mean_sub_motion = mean(motion(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            std_sub_motion = std(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            mean_sub_motion = mean(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            % TODO: consider saving number of subjects who are above motion threshold
+                        end
+                        
+                        if strcmp(motion_method,'threshold2')
+                            low_motion_threshold = 0.2;
+                            low_motion_idx = find(motion2<low_motion_threshold); % TODO: consider saving
+                            m2_work = m2_work(low_motion_idx,:);
+                            if ~isempty(score2)
+                                score2 = score2(low_motion_idx);
+                            end
+                            std_sub_motion = std(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
+                            mean_sub_motion = mean(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
                             % TODO: consider saving number of subjects who are above motion threshold
                         end
 
@@ -484,14 +525,14 @@ for i = 1:length(datasets)
 
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2,score2,motion);
+                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2);
                     else
-                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2,score2);
+                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2);
                     end
 
                     %% Append results data
 
-                    result_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
+                    result_name = ['pooling_', pooling_method, '_motion_', motion_method,'_mv_', mv_test_type];
                     results.data.(result_name).stat = stat;
                     results.data.(result_name).p = p;
                     results.data.(result_name).n = n;
