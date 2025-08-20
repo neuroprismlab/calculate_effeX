@@ -90,6 +90,10 @@ clean_data <- function(data_dir = data_dir,
     brain_masks[[name]]$mask <- data$results$study.info$mask
     
   }
+  
+  names(brain_masks) <- tolower(names(brain_masks))
+  names(stat_maps)   <- tolower(names(stat_maps))
+  
   if (testing) {
     save(study, stat_maps, brain_masks, file = output_path)
   }
