@@ -123,7 +123,7 @@ test_that("clean_data processes stat_maps correctly", {
   expect_equal(length(result$data), nrow(result$study))
   
   # Test that stat_maps names match study names
-  expect_setequal(names(result$data), result$study$name)
+  expect_setequal(names(result$data), tolower(result$study$name))
   
   # Test that each stat_map entry contains data
   for (name in names(result$data)) {
@@ -153,7 +153,7 @@ test_that("clean_data processes brain_masks correctly", {
   expect_equal(length(result$brain_masks), nrow(result$study))
   
   # Test that brain_masks names match study names
-  expect_setequal(names(result$brain_masks), result$study$name)
+  expect_setequal(names(result$brain_masks), tolower(result$study$name))
   
   # Test that each brain_mask entry has a mask
   for (name in names(result$brain_masks)) {
