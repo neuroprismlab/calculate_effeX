@@ -3,9 +3,36 @@
 % Calculate group-level statistics
 % Authors: Hallee Shearer & Stephanie Noble
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PURPOSE:
+% This script calculates group-level statistical maps from subject-level statistical maps.
+% It processes subject-level brain data (FC or activation) and computes stats for various
+% statistical tests with different combinations of:
+%     - Dimensionality: univariate or multivariate
+%     - Spatial Pooling: voxel/parcel level or network-level
+%     - Motion correction: none, regression, or thresholding of mean FD per subject
 %
-% INPUT: User defines input and output directories.
+% OVERVIEW:
+% 1. Setup paths and user inputs
+% 2. For each dataset and each statistical test available to run within that dataset:
+%     - extract and format brain data based on test type to be conducted
+%     - run all combinations of analysis parameters (pooling x motion x dimensionality)
+%     - compute simultaneous confidence intervals
+% 3. Save results
+% 
+% SUPPORTED TEST TYPES:
+% - 'r' : correlation between brain data and measures
+% - 't' : one-sample t-test
+% - 't2' : two-sample t-test between groups
+% - 'multi_*': multivariate versions of each test using canonical correlation or Hotelling's T^2
+%
+% KEY VARIABLES:
+% - m/m2: brain data matrices (subjects x variables)
+% - score: behavioral/outcome measures (e.g., age, test score, ...)
+% - motion: mean FD per subject for confound control
+% - results: output structure containing all analysis combinations
+%
+%
+% INPUT FORMAT: 
 % Each input filename within the input directory contains a data structure of the following form:
 %
 %   - study_info
@@ -37,7 +64,7 @@
 %           ...
 %
 % NOTES:
-%   Motion note: For datasets processed with our pipeline, motion already regressed from timeseries data (regresses 24 motion parameters)
+%   Motion note: For datasets processed with our Yale pipeline (ABCD, HBN, PNC, SLIM), motion is already regressed from timeseries data (regresses 24 motion parameters)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -66,31 +93,44 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% OVERARCHING SETUP
 
-
-%% Overarching setup
-
-% script and data directories
-
+% DIRECTORY CONFIGURATION
+% set input and output directories for data processing
 results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
 data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
 
+% PARAMETER CONFIGURATION
+% user can change these according to which parameters to run
+motion_method_params = {'none', 'regression', 'threshold'}; 
+low_motion_threshold = 0.1; % mean Framewise Displacement threshold (in mm)
+% set to other threshold if wanted, then name the motion method accordingly, e.g., 'threshold2' for 0.2mm
+
+% analysis choices to run
+n_network_groups = 10; % hard-coded for Shen atlas-based pooling
+pooling_params = [0, 1]; % 0 = no pooling, 1 = network-level pooling
+multivariate_params = [0, 1]; % 0 = univariate tests, 1 = multivariate tests
+
+testing=0; % USER-DEFINED - change to 1 if testing
+if testing
+    datasets = datasets(1); % run only certain dataset(s) while testing
+    testing_str = '_test'; % add a string to all filenames when testing
+else
+    testing_str = [''];
+end
+
+% ----------------------------------------------------------------------------
+
+% flags
+save_info.save = 1; % save results
+save_info.overwrite = 1; % allow overwriting existing files (initialized)
+save_info.use_same = 0; % apply same overwrite decision to all datasets
+save_info.asked = 0; % track if user has been prompted for overwrite decisiion
+
+% get current script directory and set helper paths
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/helper_scripts/'];
 reference_dir = [current_dir, '/reference/'];
-
-% params
-
-motion_method_params = {'none', 'regression', 'threshold'};
-low_motion_threshold = 0.1; % empirically, 5.7% of subjects are >0.1mm mFFD
-n_network_groups = 10; % hard-coded for Shen atlas-based pooling
-pooling_params = [0, 1];
-multivariate_params = [0, 1];
-save_info.save = 1;
-save_info.overwrite = 1; % initialized
-save_info.use_same = 0;
-save_info.asked = 0;
-testing=1; % USER-DEFINED
 
 % get list of input data filenames
 filenames = dir(data_dir);
@@ -101,82 +141,67 @@ datasets = {filenames.name};
 addpath(genpath(scripts_dir));
 addpath(genpath(reference_dir));
 
-% setup for tests
-
-if testing
-    datasets = datasets(1);
-    %pooling_params = [1];
-    testing_str = '';
-else
-    testing_str = [''];
-end
-
-
-%% Calculate effects for each test of each dataset
+%% ================ MAIN PROCESSING LOOP: DATASETS & TESTS ================
 
 disp(upper(testing_str))
 
-for i = 1:length(datasets)
+for i = 1:length(datasets) % loop through all available datasets
    
     dataset = datasets{i};
     fprintf(['Processing dataset: ',dataset,'\n'])
     
-    %TODO: TMP: remove this once we get ukb map
-%     if contains(dataset, "ukb")
-%         if ~exist('pooling_params_orig')
-%             pooling_params_orig = pooling_params;
-%         end
-%         pooling_params = [0];
-%     else
-%         if exist('pooling_params_orig')
-%             pooling_params = pooling_params_orig;
-%         end
-%     end
-    
-    % Check results exist and prompt overwrite
-
+    % ===================== FILE HANDLING AND OVERWRITE LOGIC =====================
+    % check if results already exist and prompt decisions to overwrite or not
     data_path = [data_dir, dataset];
 
     S = load(data_path,'study_info');
     results_file_pre_prefix = [results_dir, strjoin({S.study_info.dataset, S.study_info.map, testing_str}, '_'),'*'];
-    
-%     if ~isempty(dir(results_file_pre_prefix))
-%         if ~save_info.asked || ~save_info.use_same
-% 
-%             user_response = input(sprintf(['Results for ',results_file_pre_prefix,' already exist. Overwrite? [yes/no]\n> ']),'s');
-%             if strcmp(user_response,'yes')
-%                 fprintf(['Replacing results ',results_file_pre_prefix,'.\n']);
-%                 save_info.overwrite = 1;
-%             else
-%                 fprintf(['Keeping existing results ',results_file_pre_prefix,'.\n']);
-%                 save_info.overwrite = 0;
-%             end
-% 
-%             if ~save_info.asked
-%                 user_response = input(sprintf(['Repeat for all datasets? [yes/no]\n> ']),'s');
-%                 if strcmp(user_response,'yes')
-%                     fprintf('Using this setting for all.\n');
-%                     save_info.use_same = 1;
-%                 else
-%                     fprintf('Okay, will ask each time.\n');
-%                    save_info.use_same = 0;
-%                end
-%                save_info.asked = 1;
-%             end
-%         end
-%         save_info.save = save_info.overwrite;
-%     else
-%         save_info.save = 1;
-%     end
+
+    % ==================== OVERWRITE CONFIRMATION LOGIC ====================
+     if ~isempty(dir(results_file_pre_prefix))
+         if ~save_info.asked || ~save_info.use_same
+ 
+             user_response = input(sprintf(['Results for ',results_file_pre_prefix,' already exist. Overwrite? [yes/no]\n> ']),'s');
+             if strcmp(user_response,'yes')
+                 fprintf(['Replacing results ',results_file_pre_prefix,'.\n']);
+                 save_info.overwrite = 1;
+             else
+                 fprintf(['Keeping existing results ',results_file_pre_prefix,'.\n']);
+                 save_info.overwrite = 0;
+             end
+ 
+             if ~save_info.asked
+                 user_response = input(sprintf(['Repeat for all datasets? [yes/no]\n> ']),'s');
+                 if strcmp(user_response,'yes')
+                     fprintf('Using this setting for all.\n');
+                     save_info.use_same = 1;
+                 else
+                     fprintf('Okay, will ask each time.\n');
+                    save_info.use_same = 0;
+                end
+                save_info.asked = 1;
+             end
+         end
+         save_info.save = save_info.overwrite;
+     else
+         save_info.save = 1;
+     end
        
     if save_info.save
-    % Load & check data
+
+    
+    % ==================== DATA LOADING AND VALIDATION ====================
+    % Load subject-level data structure and validate its format
 
     S = load(data_path);
     S = checker(S);
 
     % get results for each test
 
+
+    % ================== ITERATE THROUGH ALL TESTS IN DATASET ================
+    % Each dataset may contain multiple statistical tests to perform
+    
     tests = fieldnames(S.outcome);
 
     for t = 1:length(tests)
@@ -184,31 +209,37 @@ for i = 1:length(datasets)
         test = tests{t}; 
         disp(['Running test "', test,'"'])
         
-        % clear results struct from last loop
+        % ================ INITIALIZE RESULTS STRUCTURE FOR TEST ===============
+        % Clear results from previous iteration and set up new structure
         results = [];
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
-        % TODO: later this is "results.data.(result_name)" - resolve this difference
-        % results.study_info = rmfield(S.study_info,'test');
+        % if a level map exists, add to results study info 
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
+
+        % infer test type to conduct based on the data available for this test
         test_type = infer_test_type(S, test);
+
+        % store test type, map type, dataset name, and date in results struct
         results.study_info.test = test_type;
         results.study_info.map = S.study_info.map;
         results.study_info.dataset = S.study_info.dataset;
-
         results.study_info.date = date;
         
-        % save mask is stored in study_info, add to results
+        % save mask if stored in study_info, add to results
         % otherwise, mask will be saved to results by test type below
         if isfield(S.study_info, 'mask')
             results.study_info.mask = S.study_info.mask;
         end
        
         
-        % For each test type, extract and clean data
+        % ============== TEST TYPE-SPECIFIC DATA EXTRACTION & PROCESSING ==============
+        % Extract and format data based on statistical test type (correlation, t-test, etc.)
 
+        % ------------------- CORRELATION TEST (r) -------------------
+        % Extract brain data, behavioral scores, and motion parameters
         if test_type == 'r'
             
             % extract relevant variables
@@ -218,7 +249,7 @@ for i = 1:length(datasets)
             score = S.outcome.(test).score;
             score_label = S.outcome.(test).score_label;
 
-            % check brain dims are n_subs x n_parcels, otherwise flip % TODO: dim checking should be added to checker, and then we just flip here
+            % check brain dims are n_subs x n_parcels, otherwise flip 
             if size(m,2) == length(S.brain_data.(condition).sub_ids)
                 m = m';
             end
@@ -228,15 +259,14 @@ for i = 1:length(datasets)
             [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
   
             % get test components and add to results
-            results.study_info.test_components = {condition, score_label}; % TODO: previously reversed - does this need to be reversed for results_filename ?
-            
-            % TODO: remove 'hstest' after testing done
+            results.study_info.test_components = {condition, score_label}; 
 
-           
-        %TODO: 
+
+        % ------------------- T-TEST (one-sample) -------------------
         elseif test_type == 't'
             
             if length(S.outcome.(test).contrast)==1 % unpaired t-test
+                % Single condition one-sample t-test
                 % TODO: should also check here if score is all 1's - contrast may not be specified
                 
                 % extract relevant variables
@@ -266,10 +296,9 @@ for i = 1:length(datasets)
                 end
                  
  
-            else % paired t-test
+            else % two-condition paired t-test
 
                 % extract relevant variables
-                % TODO: brain mask for t studies
                 % assuming that for t, contrast is 2D string array representing two contrast conditions
                 % get brain and motion data for both conditions
                 condition1 = S.outcome.(test).contrast{1};
@@ -286,25 +315,23 @@ for i = 1:length(datasets)
                 [m1, m2, motion1, motion2] = remove_missing_subs(m1, m2, S, test_type, test, condition1, condition2, motion1, motion2);
                         
                 % to facilitate paired test: take mean motion for a single confound covariate
-                % TODO: check m1 and m2 are both ordered by the same subids before the following diff
                 motion=mean([motion1,motion2],2);
                 
                 % to facilitate paired test: take CONDITION *2* - CONDITION *1* difference
-                % TODO: check m1 and m2 are both ordered by the same subids before the following diff
                 m = m2-m1;
                 
                 % get test components and add to results
                 results.study_info.test_components = {condition1, condition2};
         
             end
-        
-        elseif strcmp(test_type, 't2')
 
+        % ------------------- TWO-SAMPLE T-TEST (t2) -------------------
+        % Compare brain activity between two groups
+        elseif strcmp(test_type, 't2')
 
             contrast = S.outcome.(test).contrast;
 
             if iscell(contrast) && length(contrast) == 2
-
                 % if contrast is length 2, then combine data here and create dummy variable
                 
                 % extract relevant variables
@@ -376,10 +403,12 @@ for i = 1:length(datasets)
         end
 
 
+        % ================= RESULTS FILE MANAGEMENT =================
+        % Set up results file paths and load existing results if they exist
+        
         results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, testing_str], '_')];
 
         results_file_path = [results_file_prefix, '.mat'];
-        %results = struct();
         if exist(results_file_path, 'file')
             tmp = load(results_file_path);
             if isfield(tmp, 'results')
@@ -391,24 +420,30 @@ for i = 1:length(datasets)
         end
         
 
-        %% Run analysis for each do_pooling + motion + do_multivariate method
+        %% ========== NESTED ANALYSIS LOOPS: MULTIVARIATE x POOLING x MOTION ==========
+        % Run analysis for each combination of multivariate/univariate, pooling, and motion correction methods
 
+        % ----------- MULTIVARIATE/UNIVARIATE CONFIGURATION -----------
+        % Determine whether to run multivariate or univariate statistical tests
         for do_multivariate = multivariate_params
             if do_multivariate
-                test_type=['multi_',test_type];
+                test_type=['multi_',test_type]; % prepend 'multi_' for multivariate analyses
                 % TODO: consider whether safe to overwrite
                 mv_test_type = test_type;
             else
-                mv_test_type = 'none';
+                mv_test_type = 'none'; % run univariate analysis
             end
             disp(['   > statistical test = ', test_type])
 
-            
+            %% ============= ATLAS-BASED POOLING CONFIGURATION =============
+            % Apply network-level pooling using atlas parcellations if specified
             for do_pooling = pooling_params
 
                 %% Do large-scale pooling if specified
                 if do_pooling
-                    
+
+                    % ----------- FUNCTIONAL CONNECTIVITY POOLING -----------
+                    % Pool connectivity matrix by networks using upper triangular mask
                     if strcmp(results.study_info.map,'fc')
                         
                         triumask = logical(triu(ones(n_network_groups)));  
@@ -420,33 +455,34 @@ for i = 1:length(datasets)
                         end
                         
                         % TODO: above triumask should be read from the provided mask to avoid accidents
-                    
+
+                    % ----------- TASK ACTIVATION POOLING -----------
+                    % Pool activation data using dilated Shen network atlas
                     elseif strcmp(results.study_info.map,'act')
 
                         % load, dilate, and mask shen network atlas
                         % for now, we're using an appromiximate mapping without fully registering since we're working with large-scale networks
                         shen_nets_filename = [current_dir,'/helper_scripts/atlas_tools/atlas_mappings/shen_1mm_268_parcellation__in_subnetworks.nii.gz'];
                         shen_nets = niftiread(shen_nets_filename);
-                        shen_nets = imdilate(shen_nets, strel('cube', 3)); % to appx 
-                        shen_nets = imresize3(shen_nets, 0.5,'Method','nearest'); % to
-                        shen_nets = shen_nets(find(results.study_info.mask)); % let's work with data in the reduced dims of mask, not full 3D
+                        shen_nets = imdilate(shen_nets, strel('cube', 3)); % dilate for approximate registration
+                        shen_nets = imresize3(shen_nets, 0.5,'Method','nearest'); % downsample to match data resolution
+                        shen_nets = shen_nets(find(results.study_info.mask)); % work with data in the reduced dims of mask, not full 3D
                         % niftiwrite(shen_nets,[results_dir,'dilated_shen_nets.nii']) % run before the previous line
                         % niftiwrite(double(results.study_info.mask),[results_dir,'tmp_msk.nii'])  
 
+                        % average activation within each network for each subject
                         m2 = [];
-                        for s = 1:size(m,1) % over subjects
+                        for s = 1:size(m,1) % loop over subjects
                              m2(s,:) = average_within_atlas(m(s,:)', shen_nets, 0);
                         end
 
                     end
-                    % update results file prefix
-                    % results_file_prefix2 = [results_file_prefix,'__by_net'];
 
-                    % set pooling_method for naming
+                    % set pooling_method for result naming
                     pooling_method = 'net';
 
+                % ----------- NO POOLING: USE ORIGINAL DATA -----------
                 else
-                    % results_file_prefix2 = results_file_prefix;
                     m2 = m;
 
                     % set pooling_method for naming
@@ -455,10 +491,13 @@ for i = 1:length(datasets)
 
                 disp(['     > pooling = ', pooling_method])
 
+                % preserve copies of variables that could be altered in the loops
+                % specifically this is for thresholding since subjects are removed in the loop
                 base_m2   = m2;      % brain matrix after pooling choice
                 baseScore = score;   % score vector aligned with base_m2
                 baseMotion = motion; % motion vector aligned with base_m2
 
+                % ------------ LOOP THROUGH MOTION CORRECTION METHODS ------------
                 for motion_method_it = 1:length(motion_method_params)
 
                     %% Account/correct for motion as specified
@@ -469,7 +508,7 @@ for i = 1:length(datasets)
                     raw_name = ['pooling_', pooling_method, '_motion_', motion_method, '_mv_', mv_test_type];
                     result_name = matlab.lang.makeValidName(raw_name);
                     
-                    % if already present, skip work
+                    % if already present, skip this method
                     if isfield(results.data, result_name)
                         disp(['Skipping (already exists): ', result_name]);
                         continue
@@ -479,16 +518,13 @@ for i = 1:length(datasets)
                     m2_work   = base_m2;
                     score2    = baseScore;
                     motion2   = baseMotion;   % keep a local to make intent clear
-    
-                    % score2 = score; % changes if applying motion threshold
 
+                    % ------------ MOTION CORRECTION --------------
                     if ~strcmp(motion_method,'none')
 
-                        % Align motion and data by subject - REMOVED 051624  (removed the commented lines lines that align subjects) - TODO: check + confirm the checker uses similar logic as the removed lines
-            
                         % threshold if specified
-                        if strcmp(motion_method,'threshold1')
-                            low_motion_threshold = 0.1;
+                        % remove subjects with mean FD above low_motion_threshold
+                        if strcmp(motion_method,'threshold')
                             low_motion_idx = find(motion2<low_motion_threshold); % TODO: consider saving
                             m2_work = m2_work(low_motion_idx,:);
                             if ~isempty(score2)
@@ -498,39 +534,20 @@ for i = 1:length(datasets)
                             mean_sub_motion = mean(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
                             % TODO: consider saving number of subjects who are above motion threshold
                         end
-                        
-                        if strcmp(motion_method,'threshold2')
-                            low_motion_threshold = 0.2;
-                            low_motion_idx = find(motion2<low_motion_threshold); % TODO: consider saving
-                            m2_work = m2_work(low_motion_idx,:);
-                            if ~isempty(score2)
-                                score2 = score2(low_motion_idx);
-                            end
-                            std_sub_motion = std(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
-                            mean_sub_motion = mean(motion2(low_motion_idx)); % TODO: save this or trimmed motion vector
-                            % TODO: consider saving number of subjects who are above motion threshold
-                        end
-
-                        % update results file prefix
-                        % results_file_prefix3=[results_file_prefix2,'__with_motion_',motion_method];
-
                     end
 
 
-                    %% Run regression
-%                     if do_multivariate
-%                         test_type=['multi_',test_type];
-%                         % TODO: consider whether safe to overwrite
-%                     end
-
+                    %--------------- MOTION REGRESSION ----------------
+                    % if motion method is regression, include motion as a confound regressor
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
                         [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2);
-                    else
+                    else % otherwise run test without motion as a regressor
                         [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2);
                     end
 
-                    %% Append results data
+
+                    % ------------ APPEND RESULTS -----------------
 
                     result_name = ['pooling_', pooling_method, '_motion_', motion_method,'_mv_', mv_test_type];
                     results.data.(result_name).stat = stat;
@@ -548,9 +565,6 @@ for i = 1:length(datasets)
                         results.data.(result_name).stat_fullres = stat_fullres;
                         results.data.(result_name).p_fullres = p_fullres;
                     end
-                    
-                        
-
                 end % motion
             end % pooling
         end % multivariate
@@ -570,15 +584,16 @@ for i = 1:length(datasets)
 end % datasets
 
 
-
-
-
-
-
-%% Function definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% FUNCTION DEFINITIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
 % TODO: this is also the standard analogue to partial corr estimates, as validated by our effect_size_ref_validation. Revisit.
+
+% ------------- run_test -------------
+% this function performs the statistical test on brain data with optional motion confound regression. 
+% handles both univariate and multivariate analyses.
 
 function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
@@ -591,6 +606,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         error('%d arguments provided but only 3 or 4 allowed.',nargin)
     end
 
+    %  ------------ DATA CLEANING -----------
     % Remove incomplete cases
     if contains(test_type, 'r') || contains(test_type, 't2')
         if isempty(confounds)
@@ -614,41 +630,46 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         end 
     end
 
-    % Assign basic attributes
-    n = size(brain,1);
-    if contains(test_type,'t2') % 2 groups only exist for t2
+    % ---------- BASIC DESCRIPTIVE STATISTICS ---------------
+    % calculate sample sizes and standard deviations
+    n = size(brain,1); % total sample size
+    if contains(test_type,'t2') % Two-sample test group sizes
         n1 = sum(score==0);
         n2 = sum(score==1);
     else
-        n1 = NaN;
+        n1 = NaN; % not applicable for other tests
         n2 = NaN;
     end
-    std_brain = std(brain);
+    std_brain = std(brain); % standard deviation of brain data across subjects
+    % standard deviation of scores for tests that include scores (r and t2)
     if contains(test_type,'t2') || contains(test_type,'r') % score only exists for t2 & r
         std_score = std(score);
     else
-        std_score = NaN;
+        std_score = NaN; 
     end
      
-    % Setup for multivariate
+    %  ------------- MULTIVARAITE ANALYSIS SETUP --------------
+    % configure dimensionality reduction for multivariate tests
     if contains(test_type,'multi')
-        n_components = floor(n/50);
+        n_components = floor(n/50); % set the number of components
         n_vars = size(brain,2);
         if n_components > n_vars
-            n_components = n_vars;
+            n_components = n_vars; % can't have more components than variables
         end
     end
  
 
-    % Perform test and get results
-
     % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
     % Note: when dealing with confounds, "stat/p" is an estimate of the statistic in a multiple regression framework
     %       and stat_fullres / p_fullres is an estimate of the statistic in the case of zero confounds
+
+    % -------------  STATISTICAL TEST EXECUTION -----------
+    % perform the specified statistical test
     
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
-        
+
+        % one-sample t test
         case 't'
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
@@ -662,6 +683,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 varargout{2} = p_fullres;
             end
 
+        % two-sample t-test
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
             
@@ -675,7 +697,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
      
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
 
-
+        % brain-behavior correlation
         case 'r'
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
            
@@ -687,7 +709,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 varargout{2} = p_fullres;
             end
 
-
+        % multivariate one-sample t test
         case 'multi_t'
             %  Hotelling t-Test (Multivariate): brain is outcome
            
@@ -717,6 +739,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 varargout{2} = p_fullres;
             end
 
+        % multivariate two-sample t-test and brain behavior correlation
         case {'multi_t2', 'multi_r'}
             % Canonical Correlation (Multivariate): brain is predictor, score is outcome (equivalent to the opposite for t-test analogue)
 
@@ -771,8 +794,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                     stat = r_to_test_stats(stat, n, 0, 2);
                 end
             end
-
-
     end
 end
             
