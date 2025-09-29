@@ -19,10 +19,10 @@ library(ggpubr)
 
 # path to file containing v
 # this is the output file from combine_gl master.R script
-v_data_path <- "combine_gl/tests/test_data/output/braineffex_data_2025-07-25.RData"
+v_data_path <- "/Users/shearer.h/halleerenate@gmail.com - Google Drive/My Drive/braineffex_data_09-24-25.RData"
 
-data_dir <- paste0("combine_gl/tests/test_data/output/")
-out_basename_basename <- "create_figures/output_july-30-2025/"
+data_dir <- paste0("")
+out_basename_basename <- "create_figures/output_sept-24-2025/"
 
 # plot params - USER-DEFINED
 
@@ -30,11 +30,11 @@ plot_output_style <- c('shiny') # c('shiny', 'manuscript') # 'shiny': save plots
 
 all_effect_size_types <- c('d', 'r_sq')              # c('d', 'r_sq', 'd.full_res')
 
-all_motion <- c('none', 'regression', 'threshold')  # c('none', 'regression', 'threshold') # TODO: stat_control -> "...regression...$d", full_residualization -> "...regression...$d.full_res"
+all_motion <- c('none', 'regression', 'threshold', 'threshold2')  # c('none', 'regression', 'threshold') # TODO: stat_control -> "...regression...$d", full_residualization -> "...regression...$d.full_res"
 all_pooling <- c('net', 'none') #  # c('none','net')
 plot_multi <- c(FALSE) # TRUE, FALSE
 
-all_plot_combination_styles <- c('single', 'meta')   # c('single','meta','overlapping') # note: overlapping can only be used for manuscript
+all_plot_combination_styles <- c('single')   # c('single','meta','overlapping') # note: overlapping can only be used for manuscript
 all_grouping_var <- c('category')          # c('none', 'category', 'orig_stat_type') # used only for meta & overlap plots - TODO: separate out?
 all_manuscript_plot_types <- c('simci')  # c('simci', 'spatial', 'spatial_pow_thr', 'spatial_pow_n_thr', 'density', 'density_binned', 'power', 'power_n','power_binned','power_n_binned') # only used for plot_output_style = 'manuscript'
 
@@ -389,7 +389,7 @@ for (pooling in all_pooling) {
                   
                   if (save_plots) {
                     
-                    study_name <- names(plot_info$idx)[[i]]
+                    study_name <- tolower(names(plot_info$idx)[[i]])
                     
                     plot_fn <- paste0(out_basename, study_name, '.png')
                     ggsave(plot_fn, plot = multi_plot, width = pp$width_per_panel * pp$ncol, height = pp$height_per_panel * pp$nrow, units = pp$units, dpi = pp$res, bg = "white", device = "png")
@@ -409,7 +409,7 @@ for (pooling in all_pooling) {
                 
                 if (save_plots) {
                   
-                  plot_fn <- paste0(out_basename, '.png')
+                  plot_fn <- tolower(paste0(out_basename, '.png'))
                   
                   cat("Saving plots to...\n", plot_fn, "\n", sep = "")
                   
