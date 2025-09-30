@@ -1,7 +1,5 @@
+function do_group_level(results_dir, data_dir, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% Calculate group-level statistics
-% Authors: Hallee Shearer & Stephanie Noble
 %
 % PURPOSE:
 % This script calculates group-level statistical maps from subject-level statistical maps.
@@ -10,14 +8,6 @@
 %     - Dimensionality: univariate or multivariate
 %     - Spatial Pooling: voxel/parcel level or network-level
 %     - Motion correction: none, regression, or thresholding of mean FD per subject
-%
-% OVERVIEW:
-% 1. Setup paths and user inputs
-% 2. For each dataset and each statistical test available to run within that dataset:
-%     - extract and format brain data based on test type to be conducted
-%     - run all combinations of analysis parameters (pooling x motion x dimensionality)
-%     - compute simultaneous confidence intervals
-% 3. Save results
 % 
 % SUPPORTED TEST TYPES:
 % - 'r' : correlation between brain data and measures
@@ -31,8 +21,19 @@
 % - motion: mean FD per subject for confound control
 % - results: output structure containing all analysis combinations
 %
+% INPUTS:
+%   results_dir - Path to output directory for results
+%   data_dir    - Path to input directory containing subject-level data
 %
-% INPUT FORMAT: 
+% OPTIONAL NAME-VALUE PAIRS:
+%   'MotionMethods'       - Cell array of motion correction methods
+%                          Default: {'none', 'regression', 'threshold'}
+%   'LowMotionThreshold'  - Mean FD threshold in mm for motion thresholding
+%                          Default: 0.1
+%   'Testing'            - Flag for testing mode (0 or 1)
+%                          Default: 0
+%
+% INPUT DATA FORMAT: (the data files that are in the data_dir)
 % Each input filename within the input directory contains a data structure of the following form:
 %
 %   - study_info
@@ -66,8 +67,6 @@
 % NOTES:
 %   Motion note: For datasets processed with our Yale pipeline (ABCD, HBN, PNC, SLIM), motion is already regressed from timeseries data (regresses 24 motion parameters)
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 % OUTPUT: One file per study in output directory
 % Each output filename within the output directory will contain a data structure of the following form:
 %
@@ -93,56 +92,56 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% OVERARCHING SETUP
+%% PARSE INPUT ARGUMENTS
+p = inputParser;
+addRequired(p, 'results_dir', @ischar);
+addRequired(p, 'data_dir', @ischar);
+addParameter(p, 'MotionMethods', {'none', 'regression', 'threshold'}, @iscell);
+addParameter(p, 'LowMotionThreshold', 0.1, @isnumeric); % mean FD threshold in mm for threshold condition
+addParameter(p, 'Testing', 0, @(x) isnumeric(x) && (x==0 || x==1));
 
-% DIRECTORY CONFIGURATION
-% set input and output directories for data processing
-results_dir = '/work/neuroprism/effect_size/data/group_level/'; % USER-DEFINED
-data_dir = '/work/neuroprism/effect_size/data/subject_level/'; % USER-DEFINED
+parse(p, results_dir, data_dir, varargin{:});
 
-% PARAMETER CONFIGURATION
-% user can change these according to which parameters to run
-motion_method_params = {'none', 'regression', 'threshold'}; 
-low_motion_threshold = 0.1; % mean Framewise Displacement threshold (in mm)
-% set to other threshold if wanted, then name the motion method accordingly, e.g., 'threshold2' for 0.2mm
+motion_method_params = p.Results.MotionMethods;
+low_motion_threshold = p.Results.LowMotionThreshold;
+testing = p.Results.Testing;
 
-% analysis choices to run
+%% PARAMETER CONFIGURATION
 n_network_groups = 10; % hard-coded for Shen atlas-based pooling
 pooling_params = [0, 1]; % 0 = no pooling, 1 = network-level pooling
 multivariate_params = [0, 1]; % 0 = univariate tests, 1 = multivariate tests
 
-testing=0; % USER-DEFINED - change to 1 if testing
 if testing
-    datasets = datasets(1); % run only certain dataset(s) while testing
-    testing_str = '_test'; % add a string to all filenames when testing
+    testing_str = '_test';
 else
-    testing_str = [''];
+    testing_str = '';
 end
 
-% ----------------------------------------------------------------------------
-
-% flags
-save_info.save = 1; % save results
-save_info.overwrite = 1; % allow overwriting existing files (initialized)
-save_info.use_same = 0; % apply same overwrite decision to all datasets
-save_info.asked = 0; % track if user has been prompted for overwrite decisiion
-
-% get current script directory and set helper paths
+%% SETUP PATHS
 [current_dir,~,~] = fileparts(mfilename('fullpath'));
 scripts_dir = [current_dir,'/helper_scripts/'];
 reference_dir = [current_dir, '/reference/'];
 
 % get list of input data filenames
 filenames = dir(data_dir);
-filenames = filenames(~[filenames.isdir]);  % Remove directories from the list
-datasets = {filenames.name}; 
+filenames = filenames(~[filenames.isdir]);
+datasets = {filenames.name};
+
+if testing && ~isempty(datasets)
+    datasets = datasets(1);
+end
 
 % set paths
 addpath(genpath(scripts_dir));
 addpath(genpath(reference_dir));
 
-%% ================ MAIN PROCESSING LOOP: DATASETS & TESTS ================
+%% INITIALIZE FLAGS
+save_info.save = 1;
+save_info.overwrite = 1;
+save_info.use_same = 0;
+save_info.asked = 0;
 
+%% MAIN PROCESSING LOOP
 disp(upper(testing_str))
 
 for i = 1:length(datasets) % loop through all available datasets
@@ -188,20 +187,16 @@ for i = 1:length(datasets) % loop through all available datasets
      end
        
     if save_info.save
-
     
     % ==================== DATA LOADING AND VALIDATION ====================
     % Load subject-level data structure and validate its format
-
     S = load(data_path);
     S = checker(S);
 
     % get results for each test
 
-
     % ================== ITERATE THROUGH ALL TESTS IN DATASET ================
     % Each dataset may contain multiple statistical tests to perform
-    
     tests = fieldnames(S.outcome);
 
     for t = 1:length(tests)
@@ -215,6 +210,7 @@ for i = 1:length(datasets) % loop through all available datasets
         
         % Create new results struct per test (contains all combinations of pooling + motion method)
         % if a level map exists, add to results study info 
+        
         if isfield(S.outcome.(test), 'level_map')
             results.study_info.level_map = S.outcome.(test).level_map;
         end
@@ -243,7 +239,7 @@ for i = 1:length(datasets) % loop through all available datasets
         if test_type == 'r'
             
             % extract relevant variables
-            condition = S.outcome.(test).reference_condition; % reference condition specifies brain data for corr
+            condition = S.outcome.(test).reference_condition;
             m = S.brain_data.(condition).data;
             motion = S.brain_data.(condition).motion;
             score = S.outcome.(test).score;
@@ -261,7 +257,7 @@ for i = 1:length(datasets) % loop through all available datasets
             % get test components and add to results
             results.study_info.test_components = {condition, score_label}; 
 
-
+        
         % ------------------- T-TEST (one-sample) -------------------
         elseif test_type == 't'
             
@@ -284,7 +280,7 @@ for i = 1:length(datasets) % loop through all available datasets
                 % remove missing subject data
                 score = ones(1,size(m,1)); % temporary
                 [m, score, motion] = remove_missing_subs(m, score, S, test_type, test, condition, motion);
-                score = [];  % score is set below for unpaired one-sample t test; setting placeholder here - TODO: are these three lines really necessary? discuss
+                score = []; % score is set below for unpaired one-sample t test; setting placeholder here - TODO: are these three lines really necessary? discuss
                
                 % get test components and add to results
                 results.study_info.test_components = {condition};
@@ -295,9 +291,8 @@ for i = 1:length(datasets) % loop through all available datasets
                     results.study_info.mask_hdr = S.brain_data.(condition).mask_hdr;
                 end
                  
- 
             else % two-condition paired t-test
-
+                
                 % extract relevant variables
                 % assuming that for t, contrast is 2D string array representing two contrast conditions
                 % get brain and motion data for both conditions
@@ -307,7 +302,7 @@ for i = 1:length(datasets) % loop through all available datasets
                 m2 = S.brain_data.(condition2).data; 
                 motion1 = S.brain_data.(condition1).motion;
                 motion2 = S.brain_data.(condition2).motion;
-                score = [];  % score is set below for paired one-sample t test; setting placeholder here 
+                score = []; % score is set below for paired one-sample t test; setting placeholder here 
                 score_label = S.outcome.(test).score_label;
                 
                 % remove missing subject data
@@ -316,7 +311,7 @@ for i = 1:length(datasets) % loop through all available datasets
                         
                 % to facilitate paired test: take mean motion for a single confound covariate
                 motion=mean([motion1,motion2],2);
-                
+
                 % to facilitate paired test: take CONDITION *2* - CONDITION *1* difference
                 m = m2-m1;
                 
@@ -325,6 +320,7 @@ for i = 1:length(datasets) % loop through all available datasets
         
             end
 
+        
         % ------------------- TWO-SAMPLE T-TEST (t2) -------------------
         % Compare brain activity between two groups
         elseif strcmp(test_type, 't2')
@@ -358,11 +354,11 @@ for i = 1:length(datasets) % loop through all available datasets
                 if size(m,2) == length(S.brain_data.(condition1).sub_ids) + length(S.brain_data.(condition2).sub_ids)
                     m = m';
                 end
-               
+
                 % TODO: should also run remove_missing_subs to compare m vs motion here
 
                 % creating the dummy variable as 'score'
-                score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1)); %TODO: test
+                score = cat(1, zeros(size(m1,2), 1), ones(size(m2,2), 1));
                 % TODO: consider the simpler:
                 % score = [zeros(size(m1,2)); ones(size(m2,2))];
 
@@ -370,7 +366,6 @@ for i = 1:length(datasets) % loop through all available datasets
                 results.study_info.test_components = {condition1, condition2};
                 
             elseif isnan(contrast) && size(S.outcome.(test).score_label,1) == 1
-                
                 % else if contrast is NaN, then data is already combined -> use outcome score as dummy variable
                 
                 % extract relevant variables
@@ -382,7 +377,7 @@ for i = 1:length(datasets) % loop through all available datasets
 
                 % map score to {0,1} for regression
                 score = +(score == max(score));
-                
+
                 % TODO: need level_map for interpretation
                 %if isfield(results.study_info ,'level_map')
                 %    results.study_info.level_map;
@@ -405,7 +400,7 @@ for i = 1:length(datasets) % loop through all available datasets
 
         % ================= RESULTS FILE MANAGEMENT =================
         % Set up results file paths and load existing results if they exist
-        
+
         results_file_prefix = [results_dir, strjoin([S.study_info.dataset, S.study_info.map, test_type, results.study_info.test_components, testing_str], '_')];
 
         results_file_path = [results_file_prefix, '.mat'];
@@ -453,7 +448,7 @@ for i = 1:length(datasets) % loop through all available datasets
                             t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
                             m2(s,:) = t2(triumask);
                         end
-                        
+
                         % TODO: above triumask should be read from the provided mask to avoid accidents
 
                     % ----------- TASK ACTIVATION POOLING -----------
@@ -517,7 +512,7 @@ for i = 1:length(datasets) % loop through all available datasets
                     % reset working copies for each motion method
                     m2_work   = base_m2;
                     score2    = baseScore;
-                    motion2   = baseMotion;   % keep a local to make intent clear
+                    motion2   = baseMotion; % keep a local to make intent clear
 
                     % ------------ MOTION CORRECTION --------------
                     if ~strcmp(motion_method,'none')
@@ -536,7 +531,6 @@ for i = 1:length(datasets) % loop through all available datasets
                         end
                     end
 
-
                     %--------------- MOTION REGRESSION ----------------
                     % if motion method is regression, include motion as a confound regressor
                     if strcmp(motion_method,'regression')
@@ -545,7 +539,6 @@ for i = 1:length(datasets) % loop through all available datasets
                     else % otherwise run test without motion as a regressor
                         [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2);
                     end
-
 
                     % ------------ APPEND RESULTS -----------------
 
@@ -583,9 +576,10 @@ for i = 1:length(datasets) % loop through all available datasets
     end % overwrite
 end % datasets
 
+end % function
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% FUNCTION DEFINITIONS
+%% HELPER FUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % NOTE: Deconfounding via "residualizing" (i.e., fit brain ~ motion, then use brain residuals for subsequently estimating betas - equivalently mdl=fitlm(brain,confound); brain=mdl.Residuals) is known to bias univariate effect size estimates towards zero (i.e., conservative), particularly in the case of higher collinearity between predictors. Including the confound directly in the model should be preferred as unbiased (though there will also be higher variance in estimates with collinearity) - https://besjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-2656.2002.00618.x . We avoid deconfounding via residualizing for univariate estimates, but this appears to be the standard for multivariate estimates and to our knowledge the extent to which bias may be introduced is unclear.
@@ -618,12 +612,12 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             brain = brain(complete_cases,:);
             score = score(complete_cases,:);
             confounds = confounds(complete_cases,:); 
-        end 
+        end  
     else % 't' - ignore score
        if isempty(confounds)
             complete_cases = all(~isnan(brain), 2);
             brain = brain(complete_cases,:);
-        else % include confounds
+       else % include confounds
             complete_cases = all(~isnan(brain), 2) & all(~isnan(confounds), 2);
             brain = brain(complete_cases,:);
             confounds = confounds(complete_cases,:); 
@@ -658,14 +652,13 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         end
     end
  
-
     % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
     % Note: when dealing with confounds, "stat/p" is an estimate of the statistic in a multiple regression framework
     %       and stat_fullres / p_fullres is an estimate of the statistic in the case of zero confounds
 
     % -------------  STATISTICAL TEST EXECUTION -----------
     % perform the specified statistical test
-    
+
     switch test_type
         % Run mass univariate tests (for each brain region) or multivariate tests
 
@@ -673,7 +666,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         case 't'
             % Standard 1-Sample t-Test (Mass Univariate): brain is outcome
             % note re Regression_fast: fitlm is built-in for this but too slow for this purpose; need intercept so can't use corr
-           
             [stat,p,B] = Regression_faster_mass_univ_y([ones(n,1), confounds], brain, 1);
             
             if ~isempty(confounds)
@@ -686,7 +678,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         % two-sample t-test
         case 't2'
             % Standard 2-Sample t-Test (Mass Univariate): group ID is predictor, brain is outcome
-            
             if isempty(confounds)
                 [stat,p] = Regression_faster_mass_univ_y([ones(n,1), score], brain, 2);
             else
@@ -694,13 +685,12 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 varargout{1} = stat_fullres;
                 varargout{2} = p_fullres;
             end
-     
+
             % TODO: check p-value calculation - some previously set to 0, maybe singular for edge-wise
 
         % brain-behavior correlation
         case 'r'
             % Standard Correlation (Mass Univariate): score is outcome (standard correlation)
-           
             if isempty(confounds)
                 [stat,p]=corr(score,brain);
             else
@@ -718,16 +708,16 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 brain2 = brain;
             else
                 confound_centered = confounds - mean(confounds);
-                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
+                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered';
                 brain2 = brain - P_confound * brain;
             end
  
             % 2. Dimensionality reduction - slow (~10 sec)
-            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components, 'Centered', 'off'); % make sure not to center - we're measuring dist from 0! % aiming for 50 samples/feature for stable results a la Helmer et al.
+            [~,brain_reduced] = pca(brain2, 'NumComponents', n_components, 'Centered', 'off');
             
             % 3. Hotelling t-test 
             [t_sq,p] = Hotelling_T2_Test(brain_reduced); 
-            stat = sqrt(t_sq); % this may also be the biased unbiased estimate of mahalanobis d
+            stat = sqrt(t_sq);
 
             if ~isempty(confounds)
                 stat_fullres = stat;
@@ -750,14 +740,13 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             else
                 % confounds = confounds(complete_cases,:); % filter for only complete cases
                 confound_centered = confounds - mean(confounds);
-                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered'; % confound projection matrix
+                P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered';
                 brain2 = brain - P_confound * brain;
                 score2 = score - P_confound * score;
             end
             
             % 2. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain2, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
-
             
             % 3. Canonical Correlation (top component)
             [brain_comp,score_comp,stat,~,~,stats] = canoncorr(brain_reduced,score2);
@@ -796,4 +785,3 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
     end
 end
-            
