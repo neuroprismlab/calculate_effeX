@@ -70,55 +70,51 @@
 #           ...
 
 
-# Source everything else in the present directory
-script_dir <- dirname(script_path <- normalizePath(sys.frame(1)$ofile))
-script_filenames <- list.files(script_dir, pattern = "\\.R$", full.names = TRUE)
-script_filenames <- script_filenames[basename(script_filenames) != basename(script_path)] # skip this script
-script_filenames <- script_filenames[basename(script_filenames) != 'testing_helper.R'] # skip testing_helper
-for (file in script_filenames) {
-  source(file)
+master <- function(data_dir, script_dir, intermediate_dir, output_dir, num_sdx_r2d = 2, alpha = 0.05, final_output_file = 'braineffex_data') {
+
+  library(oro.nifti)
+
+  # Source everything else in the present directory
+  script_filenames <- list.files(script_dir, pattern = "\\.R$", full.names = TRUE)
+  script_filenames <- script_filenames[basename(script_filenames) != 'master.R'] # skip master.R
+  for (file in script_filenames) {
+    source(file)
+  }
+
+  # set final output path
+  final_output_path = file.path(output_dir, paste0(final_output_file, '_', Sys.Date(), '.RData'))
+  
+  # load individual group-level datasets, combine, and clean
+  cleaned_data <- clean_data(data_dir, script_dir, 'clean_data', intermediate_dir, testing=TRUE)
+
+  # extract data from cleaned_data
+  study <- cleaned_data$study
+  brain_masks <- cleaned_data$brain_masks
+  data <- cleaned_data$data
+
+  # check orientation of FC data with masks
+  oriented_list <- check_orientation(data, brain_masks)
+  brain_masks <- oriented_list$brain_masks
+  data <- oriented_list$data
+
+  # calculate Cohen's d and simultaneous confidence intervals for each study
+  d_maps <- calc_d(study, data, output_dir = intermediate_dir)
+
+  # checker to check dimensions (and probably more things eventually)
+  data <- checker(d_maps, int_dir = intermediate_dir)
+
+  # load template data and phen_keys
+  template <- readNIfTI("data/template_nifti.nii.gz") # assumes MNI - TODO: get actual ref
+  template <- template@.Data
+
+  # combine all data together into variable v for saving purposes
+  v <- list(study = study, brain_masks = brain_masks, data = data, template = template)
+
+  # run meta-analysis and add results to v
+  v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
+
+  # save the final results
+  save(v, file = final_output_path)
+  cat(paste('Results saved in',final_output_path))
 }
 
-#script_dir = '/home/h.shearer/hallee/calculate_effeX/combine_gl' # TODO - test+remove
-
-#source(file.path(script_dir, 'set_params.R'))
-#source(file.path(script_dir, 'clean_data.R'))
-#source(file.path(script_dir, 'calc_d.R'))
-#source(file.path(script_dir, 'calc_sim_ci.R'))
-#source(file.path(script_dir, 'helpers.R'))
-#source(file.path(script_dir, 'checker.R'))
-
-# load individual group-level datasets, combine, and clean
-cleaned_data <- clean_data(data_dir, script_dir, 'clean_data', intermediate_dir,
-                           testing=TRUE)
-
-# extract data from cleaned_data
-study <- cleaned_data$study
-brain_masks <- cleaned_data$brain_masks
-data <- cleaned_data$data
-
-# check orientation of FC data with masks
-oriented_list <- check_orientation(data, brain_masks)
-brain_masks <- oriented_list$brain_masks
-data <- oriented_list$data
-
-# calculate Cohen's d and simultaneous confidence intervals for each study
-d_maps <- calc_d(study, data, output_dir = intermediate_dir)
-
-# checker to check dimensions (and probably more things eventually)
-data <- checker(d_maps)
-
-# load template data and phen_keys
-template <- readNIfTI("combine_gl/data/template_nifti.nii.gz")  # assumes MNI - TODO: get actual ref
-template <- template@.Data
-phen_keys <- read.csv('combine_gl/data/phen_key.csv')
-
-# combine all data together into variable v for saving purposes
-v <- list(study = study, brain_masks = brain_masks, data = data, template = template, phen_keys = phen_keys)
-
-# run meta-analysis and add results to v
-v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
-
-# save the final results
-save(v, file = final_output_path)
-cat(paste('Results saved in',final_output_path))
