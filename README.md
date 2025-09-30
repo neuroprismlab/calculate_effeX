@@ -42,6 +42,27 @@ The analysis pipeline consists of three main stages:
 - **Output:** Figures as png files
 - **Language:** R
 
+---
+## Repository Structure
+Relavent files:
+```
+calculate_effex/
+├── README.md                           # information and instructions for the repo
+├── LICENSE                             # License file
+└── group_level                         # Compute group-level statistical maps from subject-level statistical maps
+  ├── group_level_example.mlx           # interactive matlab file with example of how to run group level analysis
+  ├── do_group_level.m                  # main script to run group level analysis
+  └── helper_scripts                    # scripts referenced in do_group_level.m
+└── effect_size                         # Compute effect maps from group-level statistical maps, run meta-analyses
+  ├── master.R                          # main script to run effect size analysis
+  ├── effect_size_example.ipynb         # notebook with example of how to run effect size analysis
+  └── scripts                           # scripts referenced in master.R
+└── create_figures                      # Create figures for BrainEffeX Shiny app
+  ├── example_generate_figures.ipynb    # notebook with example of how to create figures
+  ├── generate_figures.R                # main script to generate figures for BrainEffeX Shiny app  
+```
+
+---
 
 ## License
 
