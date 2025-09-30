@@ -1,6 +1,7 @@
 # Calculate_EffeX
+[![DOI](https://zenodo.org/badge/758229305.svg)](https://doi.org/10.5281/zenodo.17238826)
 
-A pipeline for calculating neuroimaging effect sizes for the BrainEffeX platform.
+A pipeline for calculating neuroimaging effect sizes for the [BrainEffeX](neuroprismlab.shinyapps.io/braineffex) platform.
 
 ## Overview
 
@@ -48,7 +49,7 @@ See [LICENSE](LICENSE) file for details.
 
 ## Citation
 
-If you use this pipeline in your research, please cite the BrainEffeX project.
+If you use this pipeline in your research, please cite the [BrainEffeX project](github.com/neuroprismlab/braineffex).
 
 ---
 
