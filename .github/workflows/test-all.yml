@@ -120,60 +120,11 @@ jobs:
           group_level/test_*.txt
         if-no-files-found: ignore
 
-  # Test MATLAB scripts in subject_level directory (simplified)
-  test-matlab-subject:
-    runs-on: ubuntu-latest  
-    name: Test MATLAB (subject_level)
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up MATLAB
-      uses: matlab-actions/setup-matlab@v2
-      
-    - name: Run MATLAB subject_level placeholder tests
-      uses: matlab-actions/run-command@v2
-      with:
-        command: |
-          cd('subject_level');
-          
-          fprintf('=== Subject-Level MATLAB Tests ===\n');
-          fprintf('Running placeholder tests...\n');
-          
-          % Basic functionality test for subject_level directory
-          try
-              % Test basic MATLAB operations
-              subject_data = randn(1000, 100);
-              processed_data = subject_data .* 1.1;
-              summary_stats = mean(processed_data, 2);
-              
-              assert(all(size(processed_data) == size(subject_data)), 'Processing should preserve dimensions');
-              assert(length(summary_stats) == 1000, 'Summary stats should have correct length');
-              
-              fprintf('✓ Subject-level basic functionality test passed\n');
-              exit(0);
-              
-          catch ME
-              fprintf('❌ Subject-level test failed: %s\n', ME.message);
-              exit(1);
-          end
-        
-    - name: Upload subject_level test outputs (if any)
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: matlab-subject-test-outputs
-        path: |
-          subject_level/*.log
-          subject_level/test_*.txt
-        if-no-files-found: ignore
-
   # Summary job that depends on all test jobs
   test-summary:
     runs-on: ubuntu-latest
     name: Test Summary
-    needs: [test-r-effect, test-matlab-group, test-matlab-subject]
+    needs: [test-r-effect, test-matlab-group]
     if: always()
     
     steps:
@@ -182,7 +133,6 @@ jobs:
         echo "=== Test Results Summary ==="
         echo "R (effect_size): ${{ needs.test-r-effect.result }}"
         echo "MATLAB (group_level): ${{ needs.test-matlab-group.result }}"
-        echo "MATLAB (subject_level): ${{ needs.test-matlab-subject.result }}"
         echo ""
         
         # Count successes
@@ -201,13 +151,6 @@ jobs:
           success_count=$((success_count + 1))
         else
           echo "❌ MATLAB group-level: FAILED"
-        fi
-        
-        if [[ "${{ needs.test-matlab-subject.result }}" == "success" ]]; then
-          echo "✅ MATLAB subject-level: PASSED"
-          success_count=$((success_count + 1))
-        else
-          echo "❌ MATLAB subject-level: FAILED"
         fi
         
         echo ""
