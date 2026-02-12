@@ -32,6 +32,13 @@ function do_group_level(results_dir, data_dir, varargin)
 %                          Default: 0.1
 %   'Testing'            - Flag for testing mode (0 or 1)
 %                          Default: 0
+%   'Atlas'              - Abbreviated name of atlas w/ num nodes
+%                          Default: "Shen268"
+%                          Currently supports "Shen268" or "Schaefer200"
+%   'NumNetworks'        - Number of networks in atlas
+%                          Default: 10
+%                          Currently supports 10 for Shen268, or 7 for
+%                          Schaefer200
 %
 % INPUT DATA FORMAT: (the data files that are in the data_dir)
 % Each input filename within the input directory contains a data structure of the following form:
@@ -99,20 +106,25 @@ addRequired(p, 'data_dir', @ischar);
 addParameter(p, 'MotionMethods', {'none', 'regression', 'threshold'}, @iscell);
 addParameter(p, 'LowMotionThreshold', 0.1, @isnumeric); % mean FD threshold in mm for threshold condition
 addParameter(p, 'Testing', 0, @(x) isnumeric(x) && (x==0 || x==1));
+% addParameter(p, 'Atlas', 'Shen268', @(x) ischar(x) && ismember(x, {'Shen268', 'Schaefer200'}));
+addParameter(p, 'NumNetworks', 10, @(x) isnumeric(x) && ismember(x, [7, 10]));
 
 parse(p, results_dir, data_dir, varargin{:});
 
 motion_method_params = p.Results.MotionMethods;
 low_motion_threshold = p.Results.LowMotionThreshold;
 testing = p.Results.Testing;
+% atlas = p.Results.Atlas;
+n_network_groups = p.Results.NumNetworks;
 
 %% PARAMETER CONFIGURATION
-n_network_groups = 10; % hard-coded for Shen atlas-based pooling
+% n_network_groups = 10; % hard-coded for Shen atlas-based pooling ***
 pooling_params = [0, 1]; % 0 = no pooling, 1 = network-level pooling
 multivariate_params = [0, 1]; % 0 = univariate tests, 1 = multivariate tests
 
 if testing
     testing_str = '_test';
+    pooling_params = 0;
 else
     testing_str = '';
 end
@@ -444,8 +456,8 @@ for i = 1:length(datasets) % loop through all available datasets
                         triumask = logical(triu(ones(n_network_groups)));  
                         m2 = []; 
                         for s = 1:size(m,1) % over subjects
-                            tr = structure_data(m(s,:),'triangleside','upper');
-                            t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default
+                            tr = structure_data(m(s,:),'triangleside','upper'); % ***
+                            t2 = summarize_matrix_by_atlas(tr,'suppressimg',1)'; % transpose because it does tril by default ***
                             m2(s,:) = t2(triumask);
                         end
 
