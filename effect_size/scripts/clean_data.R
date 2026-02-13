@@ -1,4 +1,5 @@
 # Combine and clean all group level studies
+# cleaned_data <- clean_data(data_dir, script_dir, 'clean_data', intermediate_dir, testing=TRUE)
 
 clean_data <- function(data_dir = data_dir,
                        script_dir = script_dir,
@@ -42,7 +43,7 @@ clean_data <- function(data_dir = data_dir,
     print(paste("loading", file))
     # load the file
     mat_struct = readMat(file.path(data_dir, file))
-    if (grepl('act', file)) { # special correction for readMat bug (nested lists)
+    if (grepl('_act_', file)) { # special correction for readMat bug (nested lists)
       mat_struct <- readMat_act_correction(mat_struct)
     }
     
@@ -65,7 +66,7 @@ clean_data <- function(data_dir = data_dir,
     
     name = sub("\\.mat$", "", file)
     
-    ref = ifelse(study_info$map == "act", "voxel", ifelse(study_info$dataset == "ukb", "ukb_55", "shen_268"))
+    ref = ifelse(study_info$map == "act", "voxel", ifelse(study_info$dataset == "ukb", "ukb_55", ifelse(grepl("_rbc", study_info$dataset), "schaefer_200", "shen_268")))
     
     new_row <- data.frame(basefile = file, folder = data_dir, name = name, ext = ".mat",
                           dataset = study_info$dataset, map_type = study_info$map,
