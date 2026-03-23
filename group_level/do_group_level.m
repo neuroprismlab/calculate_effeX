@@ -601,7 +601,7 @@ end % function
 % this function performs the statistical test on brain data with optional motion confound regression. 
 % handles both univariate and multivariate analyses.
 
-function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds)
+function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds,threshold_massuniv)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -609,7 +609,9 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
     if nargin==3
         confounds=[];
     elseif ~nargin==4
-        error('%d arguments provided but only 3 or 4 allowed.',nargin)
+        threshold_massuniv=NaN;
+    elseif ~nargin==5
+        error('%d arguments provided but only 3, 4, or 5 allowed.',nargin)
     end
 
     %  ------------ DATA CLEANING -----------
@@ -723,7 +725,20 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 P_confound = confound_centered / (confound_centered' * confound_centered) * confound_centered';
                 brain2 = brain - P_confound * brain;
             end
- 
+
+            % 1.1. If thresholding: first-level feature selection
+            threshold_stat_type = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
+            if ~isnan(threshold_massuniv)
+                [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
+                if strcmp(threshold_stat_type,'stat_control')
+                   [~,p_corrected] = mafdr(p_massuniv); 
+                else
+                   [~,p_corrected] = mafdr(stats_massuniv.p_fullres); 
+                end
+                mask = p_corrected < threshold_massuniv;
+                brain2 = brain2(:,mask);
+            end
+
             % 2. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain2, 'NumComponents', n_components, 'Centered', 'off');
             
@@ -756,7 +771,20 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                 brain2 = brain - P_confound * brain;
                 score2 = score - P_confound * score;
             end
-            
+           
+            % 1.1. If thresholding: first-level feature selection
+            threshold_stat_type = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
+            if ~isnan(threshold_massuniv)
+                [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
+                if strcmp(threshold_stat_type,'stat_control')
+                    mask = p_massuniv < threshold_massuniv;
+                else
+                    mask = stats_massuniv.p_fullres < threshold_massuniv;
+                end
+                mask = repmat(mask,n);
+                brain2 = brain2(mask);
+            end
+ 
             % 2. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain2, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
             
