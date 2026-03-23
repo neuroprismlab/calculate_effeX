@@ -26,19 +26,21 @@ function do_group_level(results_dir, data_dir, varargin)
 %   data_dir    - Path to input directory containing subject-level data
 %
 % OPTIONAL NAME-VALUE PAIRS:
-%   'MotionMethods'       - Cell array of motion correction methods
-%                          Default: {'none', 'regression', 'threshold'}
-%   'LowMotionThreshold'  - Mean FD threshold in mm for motion thresholding
-%                          Default: 0.1
-%   'Testing'            - Flag for testing mode (0 or 1)
-%                          Default: 0
-%   'Atlas'              - Abbreviated name of atlas w/ num nodes
-%                          Default: "Shen268"
-%                          Currently supports "Shen268" or "Schaefer200"
-%   'NumNetworks'        - Number of networks in atlas
-%                          Default: 10
-%                          Currently supports 10 for Shen268, or 7 for
-%                          Schaefer200
+%   'MotionMethods'        - Cell array of motion correction methods
+%                            Default: {'none', 'regression', 'threshold'}
+%   'LowMotionThreshold'   - Mean FD threshold in mm for motion thresholding
+%                            Default: 0.1
+%   'Testing'              - Flag for testing mode (0 or 1)
+%                            Default: 0
+%   'Atlas'                - Abbreviated name of atlas w/ num nodes
+%                            Default: "Shen268"
+%                            Currently supports "Shen268" or "Schaefer200"
+%   'NumNetworks'          - Number of networks in atlas
+%                            Default: 10
+%                            Currently supports 10 for Shen268, or 7 for
+%                            Schaefer200
+%   'PreMultivarThreshold' - Specifies percent of variables to include in multivariate analysis
+%                            Default: NaN
 %
 % INPUT DATA FORMAT: (the data files that are in the data_dir)
 % Each input filename within the input directory contains a data structure of the following form:
@@ -108,6 +110,7 @@ addParameter(p, 'LowMotionThreshold', 0.1, @isnumeric); % mean FD threshold in m
 addParameter(p, 'Testing', 0, @(x) isnumeric(x) && (x==0 || x==1));
 % addParameter(p, 'Atlas', 'Shen268', @(x) ischar(x) && ismember(x, {'Shen268', 'Schaefer200'}));
 addParameter(p, 'NumNetworks', 10, @(x) isnumeric(x) && ismember(x, [7, 10]));
+addParameter(p, 'PreMultivarThreshold', NaN, @(x) isnumeric(x));
 
 parse(p, results_dir, data_dir, varargin{:});
 
@@ -116,6 +119,7 @@ low_motion_threshold = p.Results.LowMotionThreshold;
 testing = p.Results.Testing;
 % atlas = p.Results.Atlas;
 n_network_groups = p.Results.NumNetworks;
+premultivar_threshold = p.Results.PreMultivarThreshold;
 
 %% PARAMETER CONFIGURATION
 % n_network_groups = 10; % hard-coded for Shen atlas-based pooling ***
@@ -547,9 +551,9 @@ for i = 1:length(datasets) % loop through all available datasets
                     % if motion method is regression, include motion as a confound regressor
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2);
+                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2,premultivar_threshold);
                     else % otherwise run test without motion as a regressor
-                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2);
+                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2,[],premultivar_threshold);
                     end
 
                     % ------------ APPEND RESULTS -----------------
@@ -601,7 +605,7 @@ end % function
 % this function performs the statistical test on brain data with optional motion confound regression. 
 % handles both univariate and multivariate analyses.
 
-function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds,threshold_massuniv)
+function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds,premultivar_threshold)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -609,7 +613,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
     if nargin==3
         confounds=[];
     elseif ~nargin==4
-        threshold_massuniv=NaN;
+        premultivar_threshold=NaN;
     elseif ~nargin==5
         error('%d arguments provided but only 3, 4, or 5 allowed.',nargin)
     end
@@ -727,15 +731,20 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
 
             % 1.1. If thresholding: first-level feature selection
-            threshold_stat_type = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
-            if ~isnan(threshold_massuniv)
+            premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
+            premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
+            if ~isnan(premultivar_threshold)
                 [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
-                if strcmp(threshold_stat_type,'stat_control')
-                   [~,p_corrected] = mafdr(p_massuniv); 
-                else
-                   [~,p_corrected] = mafdr(stats_massuniv.p_fullres); 
+                if strcmp(premv_threshold_stat_type,'full_res')
+                    p_massuniv = stats_massuniv.p_fullres;
                 end
-                mask = p_corrected < threshold_massuniv;
+                if strcmp(premv_threshold_strategy,'top_k')
+                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest 10%
+                    [~, mask] = mink(p_massuniv, k);
+                else % 'p_value'
+                   [~,p_corrected] = mafdr(p_massuniv); 
+                    mask = p_corrected < premultivar_threshold;
+                end
                 brain2 = brain2(:,mask);
             end
 
@@ -773,17 +782,24 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
            
             % 1.1. If thresholding: first-level feature selection
-            threshold_stat_type = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
-            if ~isnan(threshold_massuniv)
+            premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
+            premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
+            if ~isnan(premultivar_threshold)
                 [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
-                if strcmp(threshold_stat_type,'stat_control')
-                    mask = p_massuniv < threshold_massuniv;
-                else
-                    mask = stats_massuniv.p_fullres < threshold_massuniv;
+                if strcmp(premv_threshold_stat_type,'full_res')
+                    p_massuniv = stats_massuniv.p_fullres;
                 end
-                mask = repmat(mask,n);
-                brain2 = brain2(mask);
+                if strcmp(premv_threshold_strategy,'top_k')
+                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest 10%
+                    [~, mask] = mink(p_massuniv, k);
+                else % 'p_value'
+                   [~,p_corrected] = mafdr(p_massuniv); 
+                    mask = p_corrected < premultivar_threshold;
+                end
+
+                brain2 = brain2(:,mask);
             end
+
  
             % 2. Dimensionality reduction - slow (~10 sec)
             [~,brain_reduced] = pca(brain2, 'NumComponents', n_components); % aiming for 50 samples/feature for stable results a la Helmer et al.
