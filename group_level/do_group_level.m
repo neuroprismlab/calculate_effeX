@@ -124,7 +124,8 @@ premultivar_threshold = p.Results.PreMultivarThreshold;
 %% PARAMETER CONFIGURATION
 % n_network_groups = 10; % hard-coded for Shen atlas-based pooling ***
 pooling_params = [0, 1]; % 0 = no pooling, 1 = network-level pooling
-multivariate_params = [0, 1]; % 0 = univariate tests, 1 = multivariate tests
+%multivariate_params = [0, 1]; % 0 = univariate tests, 1 = multivariate tests
+multivariate_params = [1]; % 0 = univariate tests, 1 = multivariate tests
 
 if testing
     testing_str = '_test';
@@ -144,8 +145,11 @@ filenames = filenames(~[filenames.isdir]);
 datasets = {filenames.name};
 
 if testing && ~isempty(datasets)
+    fprintf('===== TESTING MODE =====\n');
+    datasets
     datasets = datasets(1);
 end
+%return
 
 % set paths
 addpath(genpath(scripts_dir));
@@ -158,7 +162,6 @@ save_info.use_same = 0;
 save_info.asked = 0;
 
 %% MAIN PROCESSING LOOP
-disp(upper(testing_str))
 
 for i = 1:length(datasets) % loop through all available datasets
    
@@ -246,7 +249,6 @@ for i = 1:length(datasets) % loop through all available datasets
             results.study_info.mask = S.study_info.mask;
         end
        
-        
         % ============== TEST TYPE-SPECIFIC DATA EXTRACTION & PROCESSING ==============
         % Extract and format data based on statistical test type (correlation, t-test, etc.)
 
@@ -434,6 +436,7 @@ for i = 1:length(datasets) % loop through all available datasets
         %% ========== NESTED ANALYSIS LOOPS: MULTIVARIATE x POOLING x MOTION ==========
         % Run analysis for each combination of multivariate/univariate, pooling, and motion correction methods
 
+%fprintf('TESTING: START ANALYSIS\n')        
         % ----------- MULTIVARIATE/UNIVARIATE CONFIGURATION -----------
         % Determine whether to run multivariate or univariate statistical tests
         for do_multivariate = multivariate_params
@@ -734,13 +737,20 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
             premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
             if ~isnan(premultivar_threshold)
-                [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
-                if strcmp(premv_threshold_stat_type,'full_res')
+                if isempty(confounds)
+                    [~,p_massuniv,~,~,~,~,~] = run_test('t',brain,score);
+                else
+                    [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
+                end
+                if strcmp(premv_threshold_stat,'fullres')
+                    if isempty(confounds) error('Specified fullres, but no confounds included.'); end
                     p_massuniv = stats_massuniv.p_fullres;
                 end
-                if strcmp(premv_threshold_strategy,'top_k')
-                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest 10%
-                    [~, mask] = mink(p_massuniv, k);
+                if strcmp(premv_threshold_strategy,'top_percent')
+                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest x%
+                    [~, idx] = mink(p_massuniv, k);
+                    mask = false(n_vars,1);
+                    mask(idx) = true;
                 else % 'p_value'
                    [~,p_corrected] = mafdr(p_massuniv); 
                     mask = p_corrected < premultivar_threshold;
@@ -782,21 +792,35 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
            
             % 1.1. If thresholding: first-level feature selection
+fprintf('TESTING: Starting special protocol\n');
             premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
             premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
             if ~isnan(premultivar_threshold)
-                [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test('t',brain,score,confounds);
-                if strcmp(premv_threshold_stat_type,'full_res')
+                if strcmp(test_type, 'multi_t2')
+                    uni_test_type = 't2';
+                else % 'r'
+                    uni_test_type = 'r';
+                end
+%fprintf('TESTING: Running mass univariate test\n');
+                if isempty(confounds)
+                    [~,p_massuniv,~,~,~,~,~] = run_test(uni_test_type,brain,score);
+                else
+                    [~,p_massuniv,~,~,~,~,~,stats_massuniv] = run_test(uni_test_type,brain,score,confounds);
+                end
+
+                if strcmp(premv_threshold_stat,'fullres')
+                    if isempty(confounds) error('Specified fullres, but no confounds included.'); end
                     p_massuniv = stats_massuniv.p_fullres;
                 end
-                if strcmp(premv_threshold_strategy,'top_k')
-                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest 10%
-                    [~, mask] = mink(p_massuniv, k);
+                if strcmp(premv_threshold_strategy,'top_percent')
+                    k = max(1, floor(premultivar_threshold * numel(p_massuniv)));   % smallest x%
+                    [~, idx] = mink(p_massuniv, k);
+                    mask = false(n_vars,1);
+                    mask(idx) = true;
                 else % 'p_value'
                    [~,p_corrected] = mafdr(p_massuniv); 
                     mask = p_corrected < premultivar_threshold;
                 end
-
                 brain2 = brain2(:,mask);
             end
 
