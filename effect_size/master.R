@@ -70,7 +70,7 @@
 #           ...
 
 
-master <- function(data_dir, script_dir, intermediate_dir, output_dir, num_sdx_r2d = 2, alpha = 0.05, final_output_file = 'braineffex_data') {
+master <- function(data_dir, script_dir, intermediate_dir, output_dir, template_filename, num_sdx_r2d = 2, alpha = 0.05, final_output_file = 'braineffex_data') {
 
   library(oro.nifti)
 
@@ -104,14 +104,14 @@ master <- function(data_dir, script_dir, intermediate_dir, output_dir, num_sdx_r
   data <- checker(d_maps, int_dir = intermediate_dir)
 
   # load template data and phen_keys
-  template <- readNIfTI("data/template_nifti.nii.gz") # assumes MNI - TODO: get actual ref
+  template <- readNIfTI(template_filename) # assumes MNI - TODO: get actual ref
   template <- template@.Data
 
   # combine all data together into variable v for saving purposes
   v <- list(study = study, brain_masks = brain_masks, data = data, template = template)
 
   # run meta-analysis and add results to v
-  v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
+  #v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
 
   # save the final results
   save(v, file = final_output_path)

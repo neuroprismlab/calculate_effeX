@@ -147,7 +147,7 @@ datasets = {filenames.name};
 if testing && ~isempty(datasets)
     fprintf('===== TESTING MODE =====\n');
     datasets
-    datasets = datasets(1);
+    datasets = datasets(2);
 end
 %return
 
@@ -533,7 +533,7 @@ for i = 1:length(datasets) % loop through all available datasets
                     score2    = baseScore;
                     motion2   = baseMotion; % keep a local to make intent clear
 
-                    % ------------ MOTION CORRECTION --------------
+                    % ------------ MOTION THRESHOLDING (OPTIONAL) --------------
                     if ~strcmp(motion_method,'none')
 
                         % threshold if specified
@@ -550,13 +550,13 @@ for i = 1:length(datasets) % loop through all available datasets
                         end
                     end
 
-                    %--------------- MOTION REGRESSION ----------------
+                    %--------------- RUN TEST ----------------
                     % if motion method is regression, include motion as a confound regressor
                     if strcmp(motion_method,'regression')
                         % include motion as a confound
-                        [stat,p,n,n1,n2,std_brain,std_score, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2,premultivar_threshold);
+                        [stat,p,n,n1,n2,std_brain,std_score,mask, stat_fullres, p_fullres] = run_test(test_type,m2_work,score2,motion2,premultivar_threshold);
                     else % otherwise run test without motion as a regressor
-                        [stat,p,n,n1,n2,std_brain,std_score] = run_test(test_type,m2_work,score2,[],premultivar_threshold);
+                        [stat,p,n,n1,n2,std_brain,std_score,mask] = run_test(test_type,m2_work,score2,[],premultivar_threshold);
                     end
 
                     % ------------ APPEND RESULTS -----------------
@@ -572,6 +572,8 @@ for i = 1:length(datasets) % loop through all available datasets
                     results.data.(result_name).pooling_method = pooling_method;
                     results.data.(result_name).motion_method = motion_method;
                     results.data.(result_name).mv_method = mv_test_type;
+                    results.data.(result_name).mask = mask;
+                    
                     
                     if strcmp(motion_method,'regression')
                         results.data.(result_name).stat_fullres = stat_fullres;
@@ -608,7 +610,7 @@ end % function
 % this function performs the statistical test on brain data with optional motion confound regression. 
 % handles both univariate and multivariate analyses.
 
-function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,brain,score,confounds,premultivar_threshold)
+function [stat,p,n,n1,n2,std_brain,std_score,mask, varargout] = run_test(test_type,brain,score,confounds,premultivar_threshold)
     % brain: n_sub x n_var, score: n_sub x 1, Optional confounds: n_sub x n_var
     % brain is brain data, score is score, confounds is motion
 
@@ -671,6 +673,14 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
         if n_components > n_vars
             n_components = n_vars; % can't have more components than variables
         end
+
+        % special premultivar_threshold param settings -TODO: should be user-defined params
+        if ~isnan(premultivar_threshold)
+            premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold)
+            premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres'
+        end
+    else
+        mask = 1; % if not multivar, no mask will be created
     end
  
     % "stat" is exactly the statistic specified by "test_type" (e.g., t-statistic for stat="t")
@@ -734,8 +744,6 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
 
             % 1.1. If thresholding: first-level feature selection
-            premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
-            premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
             if ~isnan(premultivar_threshold)
                 if isempty(confounds)
                     [~,p_massuniv,~,~,~,~,~] = run_test('t',brain,score);
@@ -756,6 +764,15 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
                     mask = p_corrected < premultivar_threshold;
                 end
                 brain2 = brain2(:,mask);
+                mask = sparse(mask); % make sparse for storage
+                
+                % redefine number of components
+                n_components = floor(n/50); % set the number of components
+                n_vars = size(brain2,2);
+                if n_components > n_vars
+                    n_components = n_vars; % can't have more components than variables
+                end
+
             end
 
             % 2. Dimensionality reduction - slow (~10 sec)
@@ -792,9 +809,7 @@ function [stat,p,n,n1,n2,std_brain,std_score, varargout] = run_test(test_type,br
             end
            
             % 1.1. If thresholding: first-level feature selection
-fprintf('TESTING: Starting special protocol\n');
-            premv_threshold_strategy = 'top_percent'; % 'top_percent' (0-1, i.e., 0.1 is top 10%) or 'p_value' (0-1, corrected p-value threshold) - TODO: should be a user-defined param
-            premv_threshold_stat = 'stat_control'; % 'stat_control' or 'fullres' - TODO: should be a user-defined param
+%fprintf('TESTING: Starting special protocol\n');
             if ~isnan(premultivar_threshold)
                 if strcmp(test_type, 'multi_t2')
                     uni_test_type = 't2';
@@ -822,6 +837,15 @@ fprintf('TESTING: Starting special protocol\n');
                     mask = p_corrected < premultivar_threshold;
                 end
                 brain2 = brain2(:,mask);
+                mask = sparse(mask); % make sparse for storage
+
+                % redefine number of components
+                n_components = floor(n/50); % set the number of components
+                n_vars = size(brain2,2);
+                if n_components > n_vars
+                    n_components = n_vars; % can't have more components than variables
+                end
+
             end
 
  
@@ -863,5 +887,6 @@ fprintf('TESTING: Starting special protocol\n');
                     stat = r_to_test_stats(stat, n, 0, 2);
                 end
             end
+
     end
 end
