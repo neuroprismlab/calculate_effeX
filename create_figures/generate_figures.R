@@ -35,10 +35,11 @@ generate_figures <- function(data_path, output_dir, plot_output_style, all_effec
   library(BrainEffeX.utils)
 
   # load data (v)
-  if(!exists("v")) {
-    load(data_path)
-  }
-
+  # if(!exists("v")) {
+  #   load(data_path)
+  # }
+  load(data_path)
+  
   # reorder_by_grouping_var <- TRUE # for single plots - force to always be true
   grouping_var_order <- NULL
   grouping_var_order$orig_stat_type <- c('r','t2','t')
