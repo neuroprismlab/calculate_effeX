@@ -111,7 +111,8 @@ master <- function(data_dir, script_dir, intermediate_dir, output_dir, num_sdx_r
   v <- list(study = study, brain_masks = brain_masks, data = data, template = template)
 
   # run meta-analysis and add results to v
-  v <- meta_analysis(v, v$brain_masks, grouping_var = "category")
+  # July 1, 2026: skip meta-analysis for now
+  # v <- meta_analysis_test(v, v$brain_masks, grouping_var = "category")
 
   # save the final results
   save(v, file = final_output_path)
