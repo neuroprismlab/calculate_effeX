@@ -77,6 +77,8 @@ function [data1, data2, varargout] = remove_missing_subs(data1, data2, S, test_t
             
             % filter data to only include subjects with brain and motion data in both conditions
             subids_intersect_all = intersect(S.brain_data.(condition1).sub_ids, S.brain_data.(condition2).sub_ids);
+            subids_intersect_all = intersect(subids_intersect_all, S.brain_data.(condition1).sub_ids_motion);
+            subids_intersect_all = intersect(subids_intersect_all, S.brain_data.(condition2).sub_ids_motion);
 
             braincond1_idx = ismember(S.brain_data.(condition1).sub_ids, subids_intersect_all);
             braincond1_data = data1(braincond1_idx,:);
@@ -85,12 +87,14 @@ function [data1, data2, varargout] = remove_missing_subs(data1, data2, S, test_t
             braincond2_sub_index = ismember(S.brain_data.(condition2).sub_ids, subids_intersect_all);
             braincond2_data = data2(braincond2_sub_index,:);
             braincond2_subids = S.brain_data.(condition2).sub_ids(braincond2_sub_index);
-        
-            motion1 = motion1(braincond1_idx,:);
-            motion1_subids = S.brain_data.(condition1).sub_ids(braincond1_idx);
+       
+            motion1_idx = ismember(S.brain_data.(condition1).sub_ids_motion, subids_intersect_all);
+            motion1 = motion1(motion1_idx);
+            motion1_subids = S.brain_data.(condition1).sub_ids_motion(motion1_idx);
             
-            motion2 = motion2(braincond2_sub_index,:);
-            motion2_subids = S.brain_data.(condition2).sub_ids(braincond2_sub_index);
+            motion2_idx = ismember(S.brain_data.(condition2).sub_ids_motion, subids_intersect_all);
+            motion2 = motion2(motion2_idx);
+            motion2_subids = S.brain_data.(condition2).sub_ids_motion(motion2_idx);
 
             % reorder all variables so subjects are in the same order
             [~, braincond1_idx] = ismember(subids_intersect_all, braincond1_subids);

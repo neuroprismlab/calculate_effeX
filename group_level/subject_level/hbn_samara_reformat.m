@@ -62,11 +62,20 @@ triu_mask = triu(true(n_nodes), 1);
 % save mask to template
 template.study_info.mask = triu_mask;
 
+% identify edges involving known-bad parcels (533, 903 have no data for any subject)
+% known problem with Schaefer 1000, see https://github.com/ThomasYeoLab/CBIG/issues/10
+[row_idx, col_idx] = find(triu_mask);
+bad_parcels = [533, 903];
+bad_edge_idx = find(ismember(row_idx, bad_parcels) | ismember(col_idx, bad_parcels));
+
 % loop through subjects and add their FC to brain data
 for i = 1:n_subs
 this_mat = data.hbn_fc(:,:,i,1);
 brain_data(:,i) = this_mat(triu_mask);
 end
+
+% zero-fill known-bad parcels' edges
+brain_data(bad_edge_idx, :) = 0;
 
 % add Movie brain data to template
 template.brain_data.movie.sub_ids = subs;
@@ -79,6 +88,10 @@ for i = 1:n_subs
 this_mat = data.hbn_fc(:,:,i,2);
 brain_data(:,i) = this_mat(triu_mask);
 end
+
+% zero-fill known-bad parcels' edges
+brain_data(bad_edge_idx, :) = 0;
+
 % add brain data to template
 template.brain_data.rest.sub_ids = subs;
 template.brain_data.rest.data = brain_data;
@@ -108,7 +121,7 @@ for t = 1:length(outcome_vars)
         end
     end
 
-    template.outcome.(var_short).score = this_outcome;
+    template.outcome.(var_short).score = this_outcome';
     template.outcome.(var_short).score_label = var_short;
     template.outcome.(var_short).sub_ids = this_outcome_subs;
     template.outcome.(var_short).category = this_category;
@@ -362,6 +375,7 @@ if ~isnumeric(all_sub_ids)
     % Replace in motion data
     [~, idx] = ismember(template.brain_data.rest.sub_ids_motion, all_sub_ids);
     template.brain_data.rest.sub_ids_motion = numeric_ids(idx);
+    [~, idx] = ismember(template.brain_data.movie.sub_ids_motion, all_sub_ids);
     template.brain_data.movie.sub_ids_motion = numeric_ids(idx);
     
     % Replace in outcome
